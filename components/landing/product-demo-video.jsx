@@ -1,276 +1,144 @@
 "use client";
 
 import * as React from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, CheckCircle2 } from "lucide-react";
-
-const STAGES = [
-  { start: 0, end: 2, label: "Connect Instagram", icon: "📸" },
-  { start: 2, end: 3, label: "Create Automation", icon: "⚡" },
-  { start: 3, end: 5, label: "Select Post & Trigger", icon: "🎯" },
-  { start: 5, end: 7, label: "Configure Reply & DM", icon: "💬" },
-  { start: 7, end: 9, label: "Publish Workflow", icon: "🚀" },
-  { start: 9, end: 10, label: "Qualified Lead Ready", icon: "✓" },
-];
 
 export function ProductDemoVideo() {
   const videoRef = React.useRef(null);
-  const containerRef = React.useRef(null);
+  const phoneRef = React.useRef(null);
 
-  const [isPlaying, setIsPlaying] = React.useState(false);
-  const [isMuted, setIsMuted] = React.useState(true);
-  const [currentTime, setCurrentTime] = React.useState(0);
-  const [duration, setDuration] = React.useState(10);
-  const [showControls, setShowControls] = React.useState(false);
-  const [hasPlayed, setHasPlayed] = React.useState(false);
+  // Auto-play when visible, pause when off-screen, respect reduced motion
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-  // Derive current workflow step
-  const activeStage = React.useMemo(() => {
-    return STAGES.find((s) => currentTime >= s.start && currentTime < s.end) || STAGES[0];
-  }, [currentTime]);
-
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
-      setHasPlayed(true);
-    } else {
-      videoRef.current.pause();
-      setIsPlaying(false);
+    // Check prefers-reduced-motion
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mediaQuery.matches) {
+      video.pause();
+      return;
     }
-  };
 
-  const toggleMute = (e) => {
-    e.stopPropagation();
-    if (!videoRef.current) return;
-    videoRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
-  };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            video.play().catch(() => {
+              // Browser autoplay policy fallback (silent catch)
+            });
+          } else {
+            video.pause();
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
 
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    setCurrentTime(videoRef.current.currentTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-      setDuration(videoRef.current.duration);
+    if (phoneRef.current) {
+      observer.observe(phoneRef.current);
     }
-  };
 
-  const handleSeek = (e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    const newTime = Math.max(0, Math.min(duration, pos * duration));
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
-  };
-
-  const handleJumpToStage = (stageStart, e) => {
-    e.stopPropagation();
-    if (videoRef.current) {
-      videoRef.current.currentTime = stageStart;
-      setCurrentTime(stageStart);
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-        setHasPlayed(true);
-      }
-    }
-  };
-
-  const handleFullscreen = (e) => {
-    e.stopPropagation();
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const s = Math.floor(seconds);
-    const m = Math.floor(s / 60);
-    const rem = s % 60;
-    return `${m}:${rem < 10 ? "0" : ""}${rem}`;
-  };
-
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4">
-      {/* Video Player Container */}
+    <div className="w-full flex justify-center items-center py-4 sm:py-6 select-none">
+      {/* Smartphone Mockup Outer Container */}
       <div
-        ref={containerRef}
-        onClick={togglePlay}
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
-        className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-border/80 bg-slate-950 shadow-2xl shadow-primary/10 cursor-pointer select-none transition-all duration-300"
+        ref={phoneRef}
+        className="relative mx-auto w-[270px] sm:w-[300px] md:w-[325px] lg:w-[340px] aspect-[9/18.8] transition-transform duration-300 hover:scale-[1.01]"
       >
-        <video
-          ref={videoRef}
-          src="/videos/product-demo.mp4"
-          poster="/videos/product-demo-poster.jpg"
-          preload="metadata"
-          playsInline
-          muted={isMuted}
-          loop
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          className="h-full w-full object-cover transition-opacity duration-300"
-        />
+        {/* Ambient Backlight Glow behind Phone */}
+        <div className="absolute -inset-4 sm:-inset-6 bg-gradient-to-b from-emerald-500/20 via-emerald-500/5 to-transparent rounded-[60px] blur-2xl -z-10 pointer-events-none" />
 
-        {/* Live Workflow Step Pill (Top Left) */}
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 backdrop-blur-md px-3.5 py-1.5 text-xs font-medium text-white shadow-lg pointer-events-none transition-transform duration-200">
-          <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-white/80">{activeStage.icon}</span>
-          <span className="font-semibold text-white tracking-tight">{activeStage.label}</span>
-          <span className="text-white/40 text-[10px] ml-1 font-mono">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-        </div>
+        {/* Physical Hardware Buttons */}
+        {/* Left: Volume Up */}
+        <div className="absolute -left-1 sm:-left-1.5 top-20 w-1 sm:w-1.5 h-9 rounded-l-md bg-slate-700 border-l border-t border-b border-slate-600/70 shadow-xs pointer-events-none" />
+        {/* Left: Volume Down */}
+        <div className="absolute -left-1 sm:-left-1.5 top-32 w-1 sm:w-1.5 h-9 rounded-l-md bg-slate-700 border-l border-t border-b border-slate-600/70 shadow-xs pointer-events-none" />
+        {/* Right: Power / Side Button */}
+        <div className="absolute -right-1 sm:-right-1.5 top-24 w-1 sm:w-1.5 h-14 rounded-r-md bg-slate-700 border-r border-t border-b border-slate-600/70 shadow-xs pointer-events-none" />
 
-        {/* 10s Speed Badge (Top Right) */}
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 text-[11px] font-semibold text-emerald-400 shadow-lg pointer-events-none">
-          <span>⚡ 10s Live Demo</span>
-        </div>
-
-        {/* Center Play Button (Shown when paused or initial) */}
-        {(!isPlaying || !hasPlayed) && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px] transition-all duration-300">
-            <button
-              type="button"
-              aria-label="Play Product Demo"
-              className="flex size-16 sm:size-20 items-center justify-center rounded-full bg-emerald-500 text-slate-950 shadow-xl shadow-emerald-500/30 transition-transform duration-200 hover:scale-105 active:scale-95"
-            >
-              <Play className="size-7 sm:size-9 fill-current ml-1" />
-            </button>
-          </div>
-        )}
-
-        {/* Interactive Bottom Control Bar */}
-        <div
-          className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent p-4 sm:p-5 transition-opacity duration-200 ${
-            showControls || !isPlaying ? "opacity-100" : "opacity-0 sm:opacity-0 group-hover:opacity-100"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Scrubber Bar */}
-          <div
-            onClick={handleSeek}
-            className="group/seek relative mb-3 h-1.5 w-full cursor-pointer rounded-full bg-white/20 transition-all hover:h-2.5"
-          >
-            {/* Progress fill */}
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all relative"
-              style={{ width: `${progressPercent}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 size-3 rounded-full bg-white shadow-md opacity-0 group-hover/seek:opacity-100 transition-opacity" />
-            </div>
-
-            {/* Stage dividers on scrubber */}
-            {STAGES.map((s, idx) => {
-              if (idx === 0) return null;
-              const leftPercent = (s.start / duration) * 100;
-              return (
-                <div
-                  key={s.label}
-                  className="absolute top-0 bottom-0 w-0.5 bg-slate-950/60 pointer-events-none"
-                  style={{ left: `${leftPercent}%` }}
-                />
-              );
-            })}
-          </div>
-
-          {/* Control Buttons & Timings */}
-          <div className="flex items-center justify-between text-white text-xs">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={togglePlay}
-                aria-label={isPlaying ? "Pause" : "Play"}
-                className="flex size-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current ml-0.5" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleMute}
-                aria-label={isMuted ? "Unmute" : "Mute"}
-                className="flex size-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-              </button>
-
-              <span className="font-mono text-white/80 text-[11px] hidden sm:inline-block">
-                {formatTime(currentTime)} / {formatTime(duration)}
+        {/* Phone Chassis (Outer Frame) */}
+        <div className="relative w-full h-full rounded-[44px] sm:rounded-[50px] p-2.5 sm:p-3 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border-[3.5px] sm:border-[4px] border-slate-600/70 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6),0_10px_25px_rgba(0,0,0,0.4)] ring-1 ring-white/10 flex flex-col">
+          
+          {/* Inner Screen Display Glass */}
+          <div className="relative w-full h-full rounded-[35px] sm:rounded-[40px] overflow-hidden bg-slate-950 border border-slate-800/80 shadow-inner flex flex-col">
+            
+            {/* Top Phone Status Bar & Dynamic Island */}
+            <div className="absolute top-0 inset-x-0 z-30 pt-2 sm:pt-2.5 px-6 flex items-center justify-between text-[11px] sm:text-xs font-semibold text-white/90 tracking-tight pointer-events-none">
+              {/* Left: Time */}
+              <span className="font-mono text-[11px] sm:text-xs tracking-tight text-white/95 drop-shadow-xs">
+                9:41
               </span>
+
+              {/* Center: Dynamic Island Pill */}
+              <div className="absolute top-2.5 sm:top-3 left-1/2 -translate-x-1/2 w-22 sm:w-26 h-5 sm:h-5.5 rounded-full bg-black border border-white/10 flex items-center justify-between px-2 shadow-md">
+                {/* Camera Lens */}
+                <div className="size-2 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">
+                  <div className="size-0.5 rounded-full bg-emerald-500/50" />
+                </div>
+                {/* Sensor */}
+                <div className="size-1 rounded-full bg-slate-900" />
+              </div>
+
+              {/* Right: Phone Status Icons (Signal, Wifi, Battery) */}
+              <div className="flex items-center gap-1.5 text-white/90 drop-shadow-xs">
+                {/* Signal Bars */}
+                <svg
+                  className="size-3.5 fill-current"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="17" width="3" height="5" rx="1" />
+                  <rect x="7" y="13" width="3" height="9" rx="1" />
+                  <rect x="12" y="9" width="3" height="13" rx="1" />
+                  <rect x="17" y="4" width="3" height="18" rx="1" />
+                </svg>
+
+                {/* WiFi Icon */}
+                <svg
+                  className="size-3.5 fill-current"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="M12 18c-.8 0-1.4.6-1.4 1.4 0 .8.6 1.4 1.4 1.4s1.4-.6 1.4-1.4c0-.8-.6-1.4-1.4-1.4zm-4.7-3.7l1.4 1.4C9.8 14.8 10.9 14.3 12 14.3s2.2.5 3.3 1.4l1.4-1.4c-1.5-1.3-3.1-2-4.7-2s-3.2.7-4.7 2zm-3.8-3.7l1.4 1.4c2.5-2.2 4.8-3.3 7.1-3.3s4.6 1.1 7.1 3.3l1.4-1.4C17.5 7.9 14.8 6.7 12 6.7s-5.5 1.2-8.5 3.9z" />
+                </svg>
+
+                {/* Battery Icon */}
+                <div className="flex items-center">
+                  <div className="w-5 h-2.5 rounded-xs border border-white/90 p-0.5 flex items-center">
+                    <div className="h-full w-full rounded-2xs bg-emerald-400" />
+                  </div>
+                  <div className="w-0.5 h-1 bg-white/90 rounded-r-xs ml-0.5" />
+                </div>
+              </div>
             </div>
 
-            {/* Quick Stage Jump Buttons (Desktop) */}
-            <div className="hidden md:flex items-center gap-1.5">
-              {STAGES.map((stage) => {
-                const isActive = currentTime >= stage.start && currentTime < stage.end;
-                return (
-                  <button
-                    key={stage.label}
-                    type="button"
-                    onClick={(e) => handleJumpToStage(stage.start, e)}
-                    className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                      isActive
-                        ? "bg-emerald-500 text-slate-950 font-semibold"
-                        : "bg-white/5 text-white/70 hover:bg-white/15 hover:text-white"
-                    }`}
-                  >
-                    {stage.label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Seamless Demonstration Video inside Smartphone Screen */}
+            <video
+              ref={videoRef}
+              src="/videos/product-demo.mp4"
+              poster="/videos/product-demo-poster.jpg"
+              preload="metadata"
+              autoPlay
+              muted
+              loop
+              playsInline
+              controls={false}
+              aria-label="RawReply mobile demonstration"
+              className="w-full h-full object-cover object-center pointer-events-none"
+            />
 
-            {/* Fullscreen Button */}
-            <button
-              type="button"
-              onClick={handleFullscreen}
-              aria-label="Toggle Fullscreen"
-              className="flex size-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-            >
-              <Maximize2 className="size-4" />
-            </button>
+            {/* Bottom Home Indicator Bar */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 w-28 sm:w-32 h-1 rounded-full bg-white/40 pointer-events-none" />
+
+            {/* Subtle Curved Glass Specular Glare */}
+            <div className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-gradient-to-br from-white/10 to-transparent blur-xl" />
           </div>
         </div>
-      </div>
-
-      {/* Interactive Phase Indicator Pills for Mobile & Tablets */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:hidden gap-1.5 pt-1">
-        {STAGES.map((stage) => {
-          const isActive = currentTime >= stage.start && currentTime < stage.end;
-          return (
-            <button
-              key={stage.label}
-              type="button"
-              onClick={(e) => handleJumpToStage(stage.start, e)}
-              className={`flex items-center gap-1.5 rounded-lg border p-2 text-left text-xs transition-all ${
-                isActive
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-950 font-semibold shadow-xs"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span className="text-xs shrink-0">{stage.icon}</span>
-              <span className="truncate text-[11px]">{stage.label}</span>
-            </button>
-          );
-        })}
       </div>
     </div>
   );
 }
-
