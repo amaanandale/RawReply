@@ -15,6 +15,8 @@ export async function POST(req) {
 
     await authService.resetPassword({
       token: validated.data.token,
+      email: validated.data.email,
+      otp: validated.data.otp,
       newPassword: validated.data.password,
     });
 

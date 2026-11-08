@@ -222,7 +222,7 @@ export const authService = {
   },
 
   /**
-   * Generate and dispatch a password reset token.
+   * Generate and dispatch a password reset token & 6-digit OTP.
    */
   async requestPasswordReset(email, appUrl = "") {
     const normalizedEmail = email.toLowerCase().trim();
@@ -233,16 +233,30 @@ export const authService = {
       return { success: true };
     }
 
+    // 1. Generate 6-digit numeric OTP code (cryptographically secure)
+    const otpCode = Math.floor(100000 + crypto.randomInt(900000)).toString();
+    const otpHash = hashToken(otpCode);
+    const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
+
+    await db.createAuthToken({
+      id: generateId("otp"),
+      userId: user.id,
+      type: "password_reset_otp",
+      tokenHash: otpHash,
+      expiresAt: otpExpiresAt,
+    });
+
+    // 2. Generate long URL token for direct links / backwards compatibility
     const rawToken = generateRandomToken();
     const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    const tokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
 
     await db.createAuthToken({
       id: generateId("tok"),
       userId: user.id,
       type: "password_reset",
       tokenHash,
-      expiresAt,
+      expiresAt: tokenExpiresAt,
     });
 
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
@@ -250,40 +264,66 @@ export const authService = {
       to: user.email,
       name: user.name,
       resetUrl,
+      otpCode,
     });
 
-    return { success: true, resetUrl };
+    return { success: true, resetUrl, otpCode };
   },
 
   /**
-   * Apply a new password using a verified reset token.
+   * Apply a new password using either a 6-digit OTP code or a verified reset token.
    */
-  async resetPassword({ token, newPassword }) {
-    if (!token || !newPassword) {
-      throw new Error("Token and new password are required.");
+  async resetPassword({ token, email, otp, newPassword }) {
+    if (!newPassword) {
+      throw new Error("New password is required.");
     }
 
-    const tokenHash = hashToken(token);
-    const tokenRecord = await db.findAuthToken(tokenHash, "password_reset");
+    let user = null;
+    let tokenRecord = null;
 
-    if (!tokenRecord) {
-      throw new Error("Invalid or expired password reset link.");
+    if (otp && email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      user = await db.findUserByEmail(normalizedEmail);
+      if (!user) {
+        throw new Error("Invalid verification code or email address.");
+      }
+
+      const otpHash = hashToken(otp.trim());
+      tokenRecord = await db.findAuthToken(otpHash, "password_reset_otp");
+
+      if (!tokenRecord || tokenRecord.user_id !== user.id) {
+        throw new Error("Invalid or expired 6-digit verification code.");
+      }
+    } else if (token) {
+      const tokenHash = hashToken(token);
+      tokenRecord = await db.findAuthToken(tokenHash, "password_reset");
+
+      if (!tokenRecord) {
+        throw new Error("Invalid or expired password reset link.");
+      }
+
+      user = await db.findUserById(tokenRecord.user_id);
+      if (!user) {
+        throw new Error("User associated with this reset link no longer exists.");
+      }
+    } else {
+      throw new Error("Verification code or reset token is required.");
     }
 
     if (tokenRecord.used_at) {
-      throw new Error("This password reset link has already been used.");
+      throw new Error("This verification code or reset link has already been used.");
     }
 
     if (new Date(tokenRecord.expires_at) < new Date()) {
-      throw new Error("This password reset link has expired.");
+      throw new Error("This verification code or reset link has expired. Please request a new code.");
     }
 
     const newPasswordHash = await hashPassword(newPassword);
 
     // Update password, mark token used, and revoke all active sessions
-    await db.updateUserPassword(tokenRecord.user_id, newPasswordHash);
+    await db.updateUserPassword(user.id, newPasswordHash);
     await db.markAuthTokenUsed(tokenRecord.id);
-    await db.revokeAllUserSessions(tokenRecord.user_id);
+    await db.revokeAllUserSessions(user.id);
 
     return { success: true };
   },

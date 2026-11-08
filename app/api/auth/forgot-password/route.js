@@ -25,13 +25,19 @@ export async function POST(req) {
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
-      `${req.headers.get("x-forwarded-proto") || "http"}://${req.headers.get("host")}`;
+      `${req.headers.get("x-forwarded-proto") || "http"}://${req.headers.get("host") || "localhost:3000"}`;
 
-    await authService.requestPasswordReset(validated.data.email, appUrl);
+    const result = await authService.requestPasswordReset(validated.data.email, appUrl);
+
+    // If SMTP is not yet configured in local development, return devOtp preview so testing is seamless
+    const isDev =
+      process.env.NODE_ENV !== "production" ||
+      (!process.env.SMTP_HOST && !process.env.RESEND_API_KEY);
 
     return NextResponse.json({
       success: true,
-      message: "If an account matches that email address, a password reset link has been dispatched.",
+      message: "If an account matches that email address, a 6-digit verification code has been dispatched.",
+      devOtp: isDev ? result.otpCode : undefined,
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 });

@@ -3,14 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Mail, KeyRound } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") || "";
+  const queryToken = searchParams.get("token") || "";
+  const queryEmail = searchParams.get("email") || "";
+  const queryOtp = searchParams.get("otp") || "";
+
+  const [token, setToken] = React.useState(queryToken);
+  const [email, setEmail] = React.useState(queryEmail);
+  const [otp, setOtp] = React.useState(queryOtp);
 
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
@@ -19,12 +25,20 @@ function ResetPasswordForm() {
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState(false);
 
+  // If token is present, we use token mode; otherwise we use OTP + email mode
+  const isOtpMode = !token || Boolean(queryOtp || (!queryToken && email));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!token) {
-      setError("Missing or invalid password reset token.");
+    if (!token && (!email || !otp)) {
+      setError("Please provide your email and the 6-digit verification code, or use a reset link.");
+      return;
+    }
+
+    if (otp && otp.trim().length !== 6) {
+      setError("The verification code must be exactly 6 digits.");
       return;
     }
 
@@ -36,10 +50,14 @@ function ResetPasswordForm() {
     setLoading(true);
 
     try {
+      const payload = token
+        ? { token, password }
+        : { email: email.trim().toLowerCase(), otp: otp.trim(), password };
+
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -68,7 +86,9 @@ function ResetPasswordForm() {
           Set New Password
         </CardTitle>
         <CardDescription className="text-xs text-muted-foreground">
-          Enter your new password below (8+ chars, 1 uppercase, 1 number).
+          {token
+            ? "Choose a new password for your account (8+ chars, 1 uppercase, 1 number)."
+            : "Enter your 6-digit code and choose a new password."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -91,9 +111,52 @@ function ResetPasswordForm() {
               </div>
             )}
 
+            {/* Email and OTP fields if no query token */}
+            {!token && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="email">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      id="email"
+                      type="email"
+                      required
+                      placeholder="name@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="otp">
+                    6-Digit Verification Code (OTP)
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      id="otp"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      required
+                      placeholder="123456"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-xs font-mono tracking-widest text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="password">
-                New Password
+                New Password (8+ chars, 1 uppercase, 1 number)
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -151,6 +214,15 @@ function ResetPasswordForm() {
                 </>
               )}
             </Button>
+
+            <div className="text-center pt-2">
+              <Link
+                href="/forgot-password"
+                className="text-xs text-muted-foreground hover:text-foreground font-medium"
+              >
+                Request a new code
+              </Link>
+            </div>
           </form>
         )}
       </CardContent>
@@ -160,7 +232,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <React.Suspense fallback={<div className="h-64 flex items-center justify-center text-xs text-muted-foreground">Loading password reset...</div>}>
+    <React.Suspense fallback={<div className="text-center py-8 text-xs text-muted-foreground">Loading...</div>}>
       <ResetPasswordForm />
     </React.Suspense>
   );

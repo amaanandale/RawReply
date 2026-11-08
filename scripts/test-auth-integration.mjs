@@ -148,6 +148,50 @@ async function runAuthTests() {
   assert(newLogin.user.id === regResult.user.id, "Login with new password must succeed");
   console.log("✅ PASS: Password reset flow with session invalidation");
 
+  // 10b. 6-Digit OTP Password Reset Flow
+  const otpResetReq = await authService.requestPasswordReset(testEmail, "http://localhost:3000");
+  assert(otpResetReq.success, "OTP reset request must succeed");
+  assert(otpResetReq.otpCode && /^\d{6}$/.test(otpResetReq.otpCode), "OTP code must be 6 numeric digits");
+
+  // Bad OTP must fail
+  let badOtpFailed = false;
+  try {
+    await authService.resetPassword({
+      email: testEmail,
+      otp: "000000",
+      newPassword: "AnotherPassword123!",
+    });
+  } catch {
+    badOtpFailed = true;
+  }
+  assert(badOtpFailed, "Invalid OTP code must be rejected");
+
+  // Valid OTP must succeed
+  const otpPassword = "FinalSecurePassword999!";
+  const validOtpExec = await authService.resetPassword({
+    email: testEmail,
+    otp: otpResetReq.otpCode,
+    newPassword: otpPassword,
+  });
+  assert(validOtpExec.success, "Password reset with valid 6-digit OTP must succeed");
+
+  // Reusing same OTP must fail
+  let reuseOtpFailed = false;
+  try {
+    await authService.resetPassword({
+      email: testEmail,
+      otp: otpResetReq.otpCode,
+      newPassword: "ShouldFailPassword123!",
+    });
+  } catch {
+    reuseOtpFailed = true;
+  }
+  assert(reuseOtpFailed, "Reusing already used OTP code must be rejected");
+
+  const otpLogin = await authService.login({ email: testEmail, password: otpPassword });
+  assert(otpLogin.user.id === regResult.user.id, "Login with OTP-reset password must succeed");
+  console.log("✅ PASS: 6-digit OTP password reset flow and replay prevention");
+
   // 11. Multi-Tenant Organization Isolation & Team Invitations
   const orgId = regResult.organizationId;
   const invitedEmail = `colleague_${testSuffix}@example.com`;
