@@ -24,7 +24,14 @@ export async function GET(req) {
   const { organizationId } = await resolveSessionContext(req);
   try {
     const accounts = await accountStore.listAccounts(organizationId);
-    return NextResponse.json({ accounts });
+    const limitStatus = await accountStore.getAccountLimitStatus(organizationId);
+    return NextResponse.json({
+      accounts,
+      limit: limitStatus.limit,
+      used: limitStatus.used,
+      remaining: limitStatus.remaining,
+      isLimitReached: limitStatus.isLimitReached,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: `Failed to load accounts: ${err.message}` },

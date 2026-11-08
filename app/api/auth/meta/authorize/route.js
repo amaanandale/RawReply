@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { PERMISSIONS, hasPermission } from "@/lib/auth/permissions";
-import { ROLES } from "@/lib/constants";
+import { ROLES, MAX_INSTAGRAM_ACCOUNTS_PER_CUSTOMER } from "@/lib/constants";
 import { db } from "@/lib/db/client";
+import { accountStore } from "@/lib/storage/account-store";
 import {
   generateSecureOAuthState,
   buildMetaUnifiedLoginUrl,
@@ -82,27 +83,44 @@ export async function GET(req) {
     return NextResponse.redirect(accountsUrl.toString());
   }
 
+  const isPlatformScope = req.nextUrl.searchParams.get("scope") === "platform";
+
   let organizationId = session.organizationId;
   const userId = session.user.id;
 
-  if (!organizationId) {
-    const userOrgs = await db.listUserOrganizations(userId);
-    if (userOrgs && userOrgs.length > 0) {
-      organizationId = userOrgs[0].id;
-    } else {
-      const orgId = `org_${Date.now()}`;
-      await db.createOrganization({
-        id: orgId,
-        name: `${session.user.name || "Default"}'s Workspace`,
-        slug: `workspace-${Date.now()}`,
-      });
-      await db.addOrganizationMember({
-        id: `mem_${Date.now()}`,
-        organizationId: orgId,
-        userId,
-        role: ROLES.OWNER,
-      });
-      organizationId = orgId;
+  if (isPlatformScope && session.isSuperAdmin) {
+    organizationId = "org_platform_super_admin";
+  } else {
+    if (!organizationId) {
+      const userOrgs = await db.listUserOrganizations(userId);
+      if (userOrgs && userOrgs.length > 0) {
+        organizationId = userOrgs[0].id;
+      } else {
+        const orgId = `org_${Date.now()}`;
+        await db.createOrganization({
+          id: orgId,
+          name: `${session.user.name || "Default"}'s Workspace`,
+          slug: `workspace-${Date.now()}`,
+        });
+        await db.addOrganizationMember({
+          id: `mem_${Date.now()}`,
+          organizationId: orgId,
+          userId,
+          role: ROLES.OWNER,
+        });
+        organizationId = orgId;
+      }
+    }
+
+    // Enforce 4 connected accounts limit per customer workspace
+    const limitStatus = await accountStore.getAccountLimitStatus(organizationId);
+    if (limitStatus.isLimitReached) {
+      accountsUrl.searchParams.set("error", "limit_reached");
+      accountsUrl.searchParams.set(
+        "message",
+        `Maximum limit of ${MAX_INSTAGRAM_ACCOUNTS_PER_CUSTOMER} connected Instagram accounts reached. Please disconnect an existing account first.`
+      );
+      return NextResponse.redirect(accountsUrl.toString());
     }
   }
 

@@ -122,7 +122,7 @@ export function AuthProvider({ children }) {
       setOrganization(null);
       setOrganizations([]);
       setRole("member");
-      router.push("/login");
+      router.push("/");
       router.refresh();
     }
   }, [router]);

@@ -14,9 +14,14 @@ function getJwtSecret() {
 
 export default async function middleware(req) {
   const pathname = req.nextUrl.pathname;
+  const isRootRoute = pathname === "/";
   const isAdminRoute = pathname.startsWith("/admin");
   const isDashboardRoute = pathname.startsWith("/dashboard");
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signup");
+  const isAuthRoute =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password");
 
   const accessToken = req.cookies.get("rawreply_access_token")?.value;
   const refreshToken = req.cookies.get("rawreply_refresh_token")?.value;
@@ -33,6 +38,20 @@ export default async function middleware(req) {
       verifiedPayload = payload;
     } catch {
       // Access token expired or invalid
+    }
+  }
+
+  // 0. Root URL redirection for logged-in users
+  if (isRootRoute) {
+    if (verifiedPayload) {
+      const destinationUrl = req.nextUrl.clone();
+      destinationUrl.pathname = verifiedPayload.adm ? "/admin" : "/dashboard";
+      return NextResponse.redirect(destinationUrl);
+    }
+    if (refreshToken) {
+      const destinationUrl = req.nextUrl.clone();
+      destinationUrl.pathname = "/dashboard";
+      return NextResponse.redirect(destinationUrl);
     }
   }
 
@@ -90,10 +109,13 @@ export default async function middleware(req) {
 
 export const config = {
   matcher: [
+    "/",
     "/admin/:path*",
     "/dashboard/:path*",
     "/login/:path*",
     "/signup/:path*",
+    "/forgot-password/:path*",
+    "/reset-password/:path*",
     "/api/:path*",
   ],
 };

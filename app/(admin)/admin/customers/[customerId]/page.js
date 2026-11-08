@@ -11,14 +11,15 @@ import {
   ShieldAlert,
   ShieldCheck,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   ArrowLeft,
   Loader2,
   RefreshCw,
-  PhoneCall,
-  Activity,
+  Zap,
+  CreditCard,
+  Send,
 } from "lucide-react";
+import { Instagram, Google } from "@/components/shared/icons";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,31 +33,40 @@ function CustomerDetailContent() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
   const [actionLoading, setActionLoading] = React.useState(false);
+  const [resetLoading, setResetLoading] = React.useState(false);
   const [actionMessage, setActionMessage] = React.useState(null);
-
-  const fetchDetails = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/customers/${customerId}`);
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to load customer details.");
-      }
-      const json = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [customerId]);
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
   React.useEffect(() => {
-    if (customerId) {
-      fetchDetails();
+    let ignore = false;
+
+    async function loadCustomer() {
+      if (!customerId) return;
+      try {
+        const res = await fetch(`/api/admin/customers/${customerId}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to load customer details.");
+        }
+        const json = await res.json();
+        if (!ignore) {
+          setData(json);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message);
+          setLoading(false);
+        }
+      }
     }
-  }, [customerId, fetchDetails]);
+
+    loadCustomer();
+
+    return () => {
+      ignore = true;
+    };
+  }, [customerId, refreshKey]);
 
   const handleStatusChange = async (targetStatus) => {
     setActionLoading(true);
@@ -79,7 +89,7 @@ function CustomerDetailContent() {
         type: "success",
         text: `Customer status updated to ${targetStatus}.`,
       });
-      await fetchDetails();
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setActionMessage({
         type: "error",
@@ -87,6 +97,32 @@ function CustomerDetailContent() {
       });
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!data?.customer?.email) return;
+    setResetLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.customer.email }),
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || "Failed to initiate password reset.");
+      setActionMessage({
+        type: "success",
+        text: `Password reset verification email sent to ${data.customer.email}.`,
+      });
+    } catch (err) {
+      setActionMessage({
+        type: "error",
+        text: err.message,
+      });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -116,7 +152,7 @@ function CustomerDetailContent() {
     );
   }
 
-  const { customer, organizations, loginHistory, errors, auditHistory } = data;
+  const { customer, instagramAccounts = [], subscription, automations = [], organizations = [], loginHistory = [], errors = [], auditHistory = [] } = data;
   const isSuspended = customer.status === "suspended";
 
   return (
@@ -133,7 +169,10 @@ function CustomerDetailContent() {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchDetails}
+          onClick={() => {
+            setLoading(true);
+            setRefreshKey((k) => k + 1);
+          }}
           disabled={loading}
           className="text-xs h-8 min-h-[36px]"
         >
@@ -163,7 +202,7 @@ function CustomerDetailContent() {
         </div>
       )}
 
-      {/* Customer Header & Profile Card */}
+      {/* 1. Customer Information Card */}
       <Card className="border border-border bg-card shadow-xs">
         <CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-1.5">
@@ -184,7 +223,7 @@ function CustomerDetailContent() {
               >
                 {customer.status}
               </Badge>
-              {customer.email_verified_at ? (
+              {customer.email_verified ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   <CheckCircle2 className="size-3" /> Email Verified
                 </span>
@@ -197,32 +236,53 @@ function CustomerDetailContent() {
             <p className="text-xs text-muted-foreground font-mono">{customer.email}</p>
           </div>
 
-          {/* Administrative Actions */}
-          <div className="flex items-center gap-2">
+          {/* 5. Administrative Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
             {!customer.is_super_admin && (
-              <Button
-                variant={isSuspended ? "default" : "destructive"}
-                size="sm"
-                onClick={() => handleStatusChange(isSuspended ? "active" : "suspended")}
-                disabled={actionLoading}
-                className="text-xs h-9 min-h-[36px]"
-              >
-                {actionLoading && <Loader2 className="size-3.5 mr-1.5 animate-spin" />}
-                {isSuspended ? "Reactivate Customer" : "Suspend Customer"}
-              </Button>
+              <>
+                <Button
+                  variant={isSuspended ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleStatusChange(isSuspended ? "active" : "suspended")}
+                  disabled={actionLoading}
+                  className={`text-xs h-9 min-h-[36px] ${
+                    !isSuspended ? "text-destructive border-destructive/30 hover:bg-destructive/10" : ""
+                  }`}
+                >
+                  {actionLoading && <Loader2 className="size-3.5 mr-1.5 animate-spin" />}
+                  {isSuspended ? "Reactivate Account" : "Suspend Account"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendResetEmail}
+                  disabled={resetLoading}
+                  className="text-xs h-9 min-h-[36px]"
+                >
+                  {resetLoading ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Send className="size-3.5 mr-1.5" />}
+                  Send Password Reset
+                </Button>
+              </>
             )}
           </div>
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6 pt-0 border-t border-border mt-3 text-xs grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <span className="text-muted-foreground block text-[11px]">Customer ID</span>
+            <span className="text-muted-foreground block text-[11px]">User ID</span>
             <span className="font-mono text-foreground font-medium truncate block">{customer.id}</span>
           </div>
           <div>
-            <span className="text-muted-foreground block text-[11px]">Registered Date</span>
+            <span className="text-muted-foreground block text-[11px]">Auth Method</span>
+            <span className="text-foreground font-medium uppercase font-mono">
+              {customer.auth_provider === "google" ? "Google Social" : "Email OTP"}
+            </span>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Registration Date</span>
             <span className="text-foreground font-medium">
-              {new Date(customer.created_at).toLocaleDateString()}
+              {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : "—"}
             </span>
           </div>
           <div>
@@ -233,112 +293,65 @@ function CustomerDetailContent() {
                 : "Never"}
             </span>
           </div>
-          <div>
-            <span className="text-muted-foreground block text-[11px]">Workspaces</span>
-            <span className="text-foreground font-medium">{organizations.length} associated</span>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Organization Details & Instagram Integrations */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Building2 className="size-4 text-primary-accent" />
-          Workspace Organizations & Integrations ({organizations.length})
-        </h2>
-
-        {organizations.length === 0 ? (
-          <Card className="border border-border bg-card p-6 text-center text-xs text-muted-foreground">
-            No active workspace organizations associated with this customer.
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {organizations.map((org) => (
-              <Card key={org.id} className="border border-border bg-card shadow-xs">
-                <CardHeader className="p-4 pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">{org.name}</CardTitle>
-                    <Badge variant="outline" className="text-[10px] capitalize">
-                      Role: {org.role}
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-xs font-mono text-muted-foreground">
-                    Slug: {org.slug}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-2 space-y-3 text-xs">
-                  <div className="flex items-center justify-between py-1 border-b border-border/60">
-                    <span className="text-muted-foreground">Team Members</span>
-                    <span className="font-semibold text-foreground">{org.memberCount} members</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-border/60">
-                    <span className="text-muted-foreground">Instagram Accounts</span>
-                    <span className="font-semibold text-foreground">{org.accounts?.length || 0} connected</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-muted-foreground">Qualified Leads</span>
-                    <span className="font-semibold text-emerald-600">{org.leadCount || 0} leads</span>
-                  </div>
-
-                  {/* Connected Accounts Details */}
-                  {org.accounts && org.accounts.length > 0 && (
-                    <div className="pt-2 space-y-1.5">
-                      <p className="text-[11px] font-semibold text-muted-foreground">Active Instagram Accounts:</p>
-                      {org.accounts.map((acc) => (
-                        <div
-                          key={acc.id}
-                          className="flex items-center justify-between bg-muted/40 p-2 rounded border border-border text-[11px]"
-                        >
-                          <span className="font-bold text-foreground">@{acc.username}</span>
-                          <span className="text-muted-foreground capitalize">{acc.accountType}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Login History & System Errors */}
+      {/* 2. Instagram Information & 3. Subscription Information */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Recent Login History */}
+        {/* Instagram Information */}
         <Card className="border border-border bg-card shadow-xs">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Activity className="size-4 text-primary-accent" />
-              Recent Authentication History
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">
-              Last 10 login events and security checkpoints.
-            </CardDescription>
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Instagram className="size-4 text-primary-accent" />
+                Instagram Information
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Connected Meta accounts (limit: 4 per customer workspace).
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-[10px] font-semibold">
+              {instagramAccounts.filter((a) => a.status === "connected").length} of 4 slots used
+            </Badge>
           </CardHeader>
           <CardContent className="p-4 pt-2">
-            {loginHistory.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">
-                No recent login activity recorded.
+            {instagramAccounts.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground border border-dashed border-border rounded-lg">
+                <Instagram className="size-6 mx-auto mb-1.5 opacity-40" />
+                <p className="font-medium text-foreground">No accounts connected</p>
+                <p className="text-[11px] mt-0.5">This customer has not connected any Instagram accounts.</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/60">
-                {loginHistory.map((evt) => (
-                  <div key={evt.id} className="py-2 flex items-start justify-between text-xs">
-                    <div>
-                      <span
-                        className={`font-semibold capitalize text-[11px] ${
-                          evt.status === "success" ? "text-emerald-600" : "text-destructive"
+              <div className="space-y-2">
+                {instagramAccounts.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-7 rounded-full bg-primary-accent/10 flex items-center justify-center shrink-0">
+                        <Instagram className="size-3.5 text-primary-accent" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-foreground">@{acc.username}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          ID: {acc.instagramId || acc.id} • {acc.accountType || "BUSINESS"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase font-semibold ${
+                          acc.status === "connected" ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : ""
                         }`}
                       >
-                        {evt.event_type?.replace(/_/g, " ")}
-                      </span>
-                      {evt.safe_error_description && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{evt.safe_error_description}</p>
-                      )}
+                        {acc.status}
+                      </Badge>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {acc.connectedAt ? new Date(acc.connectedAt).toLocaleDateString() : "Connected"}
+                      </p>
                     </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">
-                      {new Date(evt.created_at).toLocaleDateString()} {new Date(evt.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -346,49 +359,111 @@ function CustomerDetailContent() {
           </CardContent>
         </Card>
 
-        {/* Recent Errors & Audit Events */}
+        {/* Subscription Information */}
         <Card className="border border-border bg-card shadow-xs">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <ShieldAlert className="size-4 text-amber-600" />
-              Recent Issues & Audit Trail
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">
-              Administrative interventions and logged issues.
-            </CardDescription>
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CreditCard className="size-4 text-primary-accent" />
+                Subscription Information
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Customer billing plan, pricing, and active features.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-500/10 border-emerald-500/20">
+              {subscription?.status || "Active"}
+            </Badge>
           </CardHeader>
-          <CardContent className="p-4 pt-2">
-            {auditHistory.length === 0 && errors.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">
-                No issues or audit interventions recorded.
+          <CardContent className="p-4 pt-2 text-xs space-y-3">
+            <div className="p-3 rounded-lg border border-border bg-muted/20 flex items-center justify-between">
+              <div>
+                <p className="font-bold text-foreground text-sm">{subscription?.plan || "Free Launch Plan"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Billing cycle: {subscription?.billingCycle || "Free"} • Price: {subscription?.price || "$0"}
+                </p>
               </div>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {auditHistory.slice(0, 5).map((log) => (
-                  <div key={log.id} className="py-2 text-xs">
-                    <p className="font-semibold text-[11px] text-foreground capitalize">
-                      {log.action?.replace(/_/g, " ")}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      By {log.actor_email} • {new Date(log.created_at).toLocaleString()}
-                    </p>
-                  </div>
+              <Badge variant="outline" className="text-xs font-semibold">
+                $0 / month
+              </Badge>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Features Included:</p>
+              <ul className="space-y-1.5 text-[11px]">
+                {(subscription?.features || [
+                  "Up to 4 Instagram accounts",
+                  "Unlimited DM & comment automations",
+                  "Verified phone lead qualification gate",
+                  "Excel / Sheets export integration",
+                ]).map((feat, i) => (
+                  <li key={i} className="flex items-center gap-1.5 text-foreground">
+                    <CheckCircle2 className="size-3 text-emerald-600 shrink-0" />
+                    <span>{feat}</span>
+                  </li>
                 ))}
-                {errors.slice(0, 5).map((err) => (
-                  <div key={err.id} className="py-2 text-xs">
-                    <p className="font-semibold text-[11px] text-destructive">
-                      [{err.category}] {err.safe_message}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Seen {err.occurrence_count || 1} time(s) • Last: {new Date(err.last_seen_at).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+              </ul>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* 4. Automation Information */}
+      <Card className="border border-border bg-card shadow-xs">
+        <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="size-4 text-emerald-600" />
+              Automation Workflows ({automations.length})
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Comment-to-DM triggers configured by this customer.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-emerald-600 font-semibold">{customer.activeAutomations || 0} active</span>
+            <span className="text-muted-foreground">• {customer.inactiveAutomations || 0} inactive</span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          {automations.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground border border-dashed border-border rounded-lg">
+              <Zap className="size-6 mx-auto mb-1.5 opacity-40" />
+              <p className="font-medium text-foreground">No automations created yet</p>
+              <p className="text-[11px] mt-0.5">This customer has not built any Instagram comment-to-DM workflows.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {automations.map((a) => (
+                <div key={a.id} className="py-2.5 flex items-start justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground">{a.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase font-bold py-0 ${
+                          a.status === "active" ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : ""
+                        }`}
+                      >
+                        {a.status}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Trigger keyword: <span className="font-semibold text-foreground">{a.triggerKeyword}</span>
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 italic">
+                      Reply: &ldquo;{a.replyText}&rdquo;
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                    {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -407,4 +482,3 @@ export default function CustomerDetailPage() {
     </React.Suspense>
   );
 }
-

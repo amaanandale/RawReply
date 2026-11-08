@@ -149,17 +149,44 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
       {/* Connected Accounts Section */}
       {accounts.length > 0 ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">
-              Connected Professional Accounts ({accounts.length})
-            </h2>
-            <Button size="sm" asChild className="h-9 px-3">
-              <a href="/api/auth/meta/authorize">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Connected Accounts ({accounts.length})
+                </h2>
+                <Badge variant={accounts.length >= 4 ? "destructive" : "outline"} className="text-[11px] font-mono">
+                  {accounts.length} of 4 slots used ({Math.max(0, 4 - accounts.length)} remaining)
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Maximum 4 connected accounts permitted per workspace.
+              </p>
+            </div>
+
+            {accounts.length >= 4 ? (
+              <Button size="sm" disabled className="h-9 px-3 opacity-60 cursor-not-allowed" title="Maximum of 4 connected accounts reached">
                 <Plus className="size-4 mr-1.5" />
-                Connect Another Account
-              </a>
-            </Button>
+                Limit Reached (4/4)
+              </Button>
+            ) : (
+              <Button size="sm" asChild className="h-9 px-3">
+                <a href="/api/auth/meta/authorize">
+                  <Plus className="size-4 mr-1.5" />
+                  Connect Another Account
+                </a>
+              </Button>
+            )}
           </div>
+
+          {accounts.length >= 4 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-center gap-2">
+              <AlertCircle className="size-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Account Limit Reached:</strong> You have reached the maximum allowed limit of 4 connected Instagram accounts. To connect a new account, disconnect an existing one below.
+              </span>
+            </div>
+          )}
 
           {/* Mobile-First Stacked Account Cards */}
           <div className="grid gap-4 sm:grid-cols-2">

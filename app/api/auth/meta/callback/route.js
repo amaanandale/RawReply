@@ -175,7 +175,24 @@ export async function GET(req) {
       );
     }
 
-    // 11. Durably save the account in AccountStore with AES-256-GCM encrypted tokens
+    // 11. Enforce 4-account limit for customer workspaces before saving
+    const isPlatform = organizationId === "org_platform_super_admin";
+    if (!isPlatform) {
+      const existingAccounts = await accountStore.listAccounts(organizationId);
+      const isAlreadyConnected = existingAccounts.some(
+        (a) => a.instagramBusinessId === primaryTarget.instagram.id || a.id === primaryTarget.instagram.id
+      );
+      if (!isAlreadyConnected && existingAccounts.length >= 4) {
+        accountsRedirectUrl.searchParams.set("error", "account_limit_reached");
+        accountsRedirectUrl.searchParams.set(
+          "message",
+          "Maximum limit of 4 connected Instagram accounts reached. Please disconnect an existing account first."
+        );
+        return redirectWithClearedCookie(accountsRedirectUrl.toString());
+      }
+    }
+
+    // 12. Durably save the account in AccountStore with AES-256-GCM encrypted tokens
     await accountStore.saveAccount({
       organizationId,
       instagramBusinessId: primaryTarget.instagram.id,
@@ -201,9 +218,13 @@ export async function GET(req) {
       })
     );
 
-    accountsRedirectUrl.searchParams.set("success", "connected");
-    accountsRedirectUrl.searchParams.set("username", primaryTarget.instagram.username);
-    return redirectWithClearedCookie(accountsRedirectUrl.toString());
+    const destinationUrl = isPlatform
+      ? new URL("/admin/integrations", appUrl)
+      : accountsRedirectUrl;
+
+    destinationUrl.searchParams.set("success", "connected");
+    destinationUrl.searchParams.set("username", primaryTarget.instagram.username);
+    return redirectWithClearedCookie(destinationUrl.toString());
   } catch (err) {
     console.error(
       JSON.stringify({

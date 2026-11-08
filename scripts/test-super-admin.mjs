@@ -66,6 +66,7 @@ async function runTests() {
 
   // 2. Super Admin Provisioning & Token Verification
   console.log("\n--- Test 2: Super Admin Provisioning & JWT Claims ---");
+  process.env.SUPER_ADMIN_EMAIL = testAdminEmail;
   const adminPasswordHash = await hashPassword(password);
   const adminUser = await db.createUser({
     id: `usr_adm_${timestamp}`,

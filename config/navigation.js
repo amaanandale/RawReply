@@ -44,12 +44,6 @@ export const DASHBOARD_NAV_ITEMS = [
     exact: false,
   },
   {
-    title: "Team Members",
-    href: "/dashboard/team",
-    icon: UserCheck,
-    exact: false,
-  },
-  {
     title: "Activity & Issues",
     href: "/dashboard/activity",
     icon: Activity,

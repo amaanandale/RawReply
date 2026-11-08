@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "node scripts/migrate.js",
-    "test": "node scripts/test-auth-integration.mjs && node scripts/test-meta-integration.mjs && node scripts/test-super-admin.mjs && node scripts/test-leads-excel.mjs && node scripts/test-database-superadmin.mjs"
+    "test": "node scripts/test-auth-integration.mjs && node scripts/test-meta-integration.mjs && node scripts/test-super-admin.mjs && node scripts/test-leads-excel.mjs && node scripts/test-database-superadmin.mjs && node scripts/test-phase1-architecture.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

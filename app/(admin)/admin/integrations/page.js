@@ -14,6 +14,8 @@ import {
   Activity,
   CheckCircle2,
   AlertTriangle,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Instagram } from "@/components/shared/icons";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -21,21 +23,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function AdminIntegrationsPage() {
-  const [integrations, setIntegrations] = React.useState([]);
+  const [platformAccounts, setPlatformAccounts] = React.useState([]);
+  const [customerAccounts, setCustomerAccounts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
+  const [actionLoading, setActionLoading] = React.useState(null);
+  const [successMsg, setSuccessMsg] = React.useState(null);
   const [refreshIndex, setRefreshIndex] = React.useState(0);
 
   React.useEffect(() => {
     let ignore = false;
 
     async function loadIntegrations() {
+      setLoading(true);
+      setError(null);
       try {
         const res = await fetch("/api/admin/integrations");
         if (!res.ok) throw new Error("Failed to load integrations.");
         const data = await res.json();
         if (!ignore) {
-          setIntegrations(data.integrations || []);
+          setPlatformAccounts(data.platformAccounts || []);
+          setCustomerAccounts(data.customerAccounts || []);
           setLoading(false);
         }
       } catch (err) {
@@ -54,8 +62,27 @@ export default function AdminIntegrationsPage() {
   }, [refreshIndex]);
 
   const handleRefresh = () => {
-    setLoading(true);
     setRefreshIndex((prev) => prev + 1);
+  };
+
+  const handleDisconnect = async (organizationId, accountId, username) => {
+    if (!confirm(`Are you sure you want to disconnect @${username}?`)) return;
+    setActionLoading(accountId);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch(`/api/admin/integrations?organizationId=${organizationId}&accountId=${accountId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to disconnect account.");
+      setSuccessMsg(`Successfully disconnected @${username}.`);
+      handleRefresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -64,10 +91,10 @@ export default function AdminIntegrationsPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-            Instagram Integrations Monitoring
+            Instagram Integrations & Platform Accounts
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Database-backed Instagram Professional accounts linked via Meta Unified Login.
+            Manage platform-owned operational accounts and monitor customer Instagram connections.
           </p>
         </div>
 
@@ -94,23 +121,104 @@ export default function AdminIntegrationsPage() {
         </div>
       )}
 
+      {successMsg && (
+        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 flex items-center gap-2">
+          <CheckCircle2 className="size-4 shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
       {/* Security Banner */}
       <div className="rounded-lg border border-border bg-card p-3.5 text-xs text-muted-foreground flex items-center gap-3">
         <ShieldCheck className="size-5 text-emerald-600 shrink-0" />
         <span>
-          <strong>Zero-Exposure Security:</strong> All Meta OAuth Page and User Access Tokens are encrypted with AES-256-GCM at rest and are strictly stripped from all administrative responses and control plane views.
+          <strong>Zero-Exposure Security:</strong> All Meta OAuth Page and User Access Tokens are encrypted with AES-256-GCM at rest and strictly stripped from all administrative control plane views.
         </span>
       </div>
 
-      {/* Integrations List */}
+      {/* 1. Super Admin Platform Instagram Accounts */}
+      <Card className="border border-primary-accent/30 bg-card shadow-xs">
+        <CardHeader className="p-4 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+                <Instagram className="size-4 text-primary-accent" />
+                Platform-Owned Instagram Accounts
+              </CardTitle>
+              <Badge variant="outline" className="text-[10px] uppercase font-bold text-primary-accent border-primary-accent/30">
+                Super Admin Account
+              </Badge>
+            </div>
+            <CardDescription className="text-xs text-muted-foreground mt-0.5">
+              Platform accounts for system operations, health verification, and platform-level automations. Does NOT consume customer slots.
+            </CardDescription>
+          </div>
+
+          <Button asChild size="sm" className="text-xs shrink-0 bg-primary-accent hover:bg-primary-accent/90 text-white min-h-[36px]">
+            <a href="/api/auth/meta/authorize?scope=platform">
+              <Plus className="size-3.5 mr-1.5" />
+              Connect Platform Account
+            </a>
+          </Button>
+        </CardHeader>
+
+        <CardContent className="p-0 border-t border-border">
+          {loading ? (
+            <div className="py-8 flex flex-col items-center justify-center text-xs text-muted-foreground">
+              <Loader2 className="size-4 animate-spin text-primary-accent mb-1" />
+              <span>Scanning platform accounts...</span>
+            </div>
+          ) : platformAccounts.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              <Instagram className="size-6 mx-auto mb-1.5 opacity-40 text-primary-accent" />
+              <p className="font-semibold text-foreground">No Platform Instagram Accounts Connected</p>
+              <p className="text-[11px] mt-0.5">Click &ldquo;Connect Platform Account&rdquo; above to link a Super Admin operational account.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {platformAccounts.map((account) => (
+                <div key={account.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-primary-accent/5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-foreground">@{account.username}</span>
+                      <Badge variant="outline" className="text-[9px] uppercase font-bold text-primary-accent border-primary-accent/40 bg-card">
+                        Platform Account
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] text-emerald-700 bg-emerald-500/10 border-emerald-500/20 uppercase font-semibold">
+                        {account.status}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      ID: {account.instagramAccountId} • Page: {account.pageName || account.pageId || "Platform Page"} • Connected: {new Date(account.connectedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={actionLoading === account.id}
+                    onClick={() => handleDisconnect(account.organizationId, account.id, account.username)}
+                    className="text-xs h-8 text-destructive border-destructive/30 hover:bg-destructive/10 shrink-0 self-start sm:self-center"
+                  >
+                    {actionLoading === account.id ? <Loader2 className="size-3 animate-spin mr-1" /> : <Trash2 className="size-3 mr-1" />}
+                    Disconnect
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2. Customer Instagram Integrations */}
       <Card className="border border-border bg-card shadow-xs">
         <CardHeader className="p-4 pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Instagram className="size-4 text-primary-accent" />
-            Connected Instagram Accounts ({integrations.length})
+            <Instagram className="size-4 text-muted-foreground" />
+            Customer Instagram Integrations ({customerAccounts.length})
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            Real Instagram Business and Creator profiles active on RawReply.
+            Customer Business and Creator accounts connected via Meta OAuth (maximum 4 per workspace).
           </CardDescription>
         </CardHeader>
 
@@ -118,23 +226,23 @@ export default function AdminIntegrationsPage() {
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-xs text-muted-foreground">
               <Loader2 className="size-5 animate-spin text-primary-accent mb-2" />
-              <span>Scanning connected accounts...</span>
+              <span>Scanning customer accounts...</span>
             </div>
-          ) : integrations.length === 0 ? (
+          ) : customerAccounts.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
               <div className="rounded-full bg-primary-accent/10 p-3 text-primary-accent">
                 <Instagram className="size-6" />
               </div>
               <h3 className="text-sm font-semibold text-foreground">
-                No Instagram Accounts Connected
+                No Customer Accounts Connected
               </h3>
               <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
-                No customer workspaces have completed the Instagram OAuth flow yet. When an account is connected from the Customer Dashboard, its metadata will register here.
+                When customers connect their Instagram accounts from their dashboard, they will appear here.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {integrations.map((account) => {
+              {customerAccounts.map((account) => {
                 const isConnected = account.status === "connected";
 
                 return (
@@ -193,7 +301,6 @@ export default function AdminIntegrationsPage() {
                         </div>
                       </div>
 
-                      {/* Technical & Token Expiration Metadata */}
                       <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-1">
                         <span className="flex items-center gap-1">
                           <Calendar className="size-3" />
@@ -218,20 +325,18 @@ export default function AdminIntegrationsPage() {
                           </span>
                         </span>
                       </div>
-
-                      {/* Error or Webhook Status */}
-                      {account.lastError ? (
-                        <div className="text-[11px] text-destructive flex items-center gap-1 pt-1">
-                          <AlertTriangle className="size-3 shrink-0" />
-                          <span>Last API Error: {account.lastError}</span>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-emerald-600 flex items-center gap-1 pt-1">
-                          <CheckCircle2 className="size-3 shrink-0" />
-                          <span>Webhooks Verified (Subscribed to Feed & Messaging)</span>
-                        </div>
-                      )}
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={actionLoading === account.id}
+                      onClick={() => handleDisconnect(account.organizationId, account.id, account.username)}
+                      className="text-xs h-8 text-destructive border-destructive/30 hover:bg-destructive/10 shrink-0 self-start lg:self-center"
+                    >
+                      {actionLoading === account.id ? <Loader2 className="size-3 animate-spin mr-1" /> : <Trash2 className="size-3 mr-1" />}
+                      Disconnect
+                    </Button>
                   </div>
                 );
               })}

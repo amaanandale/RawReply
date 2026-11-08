@@ -76,8 +76,20 @@ export function AdminHeader({ onToggleSidebar }) {
         </div>
       </div>
 
-      {/* Right: Super Admin Pill & User Profile Menu */}
-      <div className="flex items-center gap-3">
+      {/* Right: Super Admin Pill, Customer Dashboard Link & User Profile Menu */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className="hidden sm:inline-flex items-center gap-1.5 text-xs text-foreground border-border hover:bg-muted"
+        >
+          <Link href="/dashboard">
+            <LayoutDashboard className="size-3.5" />
+            <span>Customer Dashboard</span>
+          </Link>
+        </Button>
+
         <Badge
           variant="outline"
           className="hidden sm:inline-flex items-center gap-1.5 border-primary-accent/30 bg-primary-accent/10 text-primary-accent font-semibold text-[11px]"

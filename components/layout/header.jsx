@@ -112,8 +112,22 @@ export function DashboardHeader({ onToggleSidebar }) {
         </div>
       </div>
 
-      {/* Right: Organization Switcher & User Profile */}
-      <div className="flex items-center gap-3">
+      {/* Right: Super Admin Switcher, Organization Switcher & User Profile */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {user?.isSuperAdmin && (
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="border-primary-accent/40 bg-primary-accent/10 text-primary-accent hover:bg-primary-accent/20 text-xs font-semibold h-8 px-2.5 shadow-2xs"
+          >
+            <Link href="/admin">
+              <Shield className="size-3.5 mr-1 text-primary-accent" />
+              <span>Back to Super Admin</span>
+            </Link>
+          </Button>
+        )}
+
         {user ? (
           <>
             {/* Custom Organization Switcher */}

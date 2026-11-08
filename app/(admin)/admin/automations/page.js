@@ -1,14 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Zap, AlertCircle, RefreshCw, Loader2, Bot } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Zap, AlertCircle, RefreshCw, Loader2, Bot, Calendar } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-export default function AdminAutomationsPage() {
+function AutomationsContent() {
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams.get("status") || "";
+
   const [automations, setAutomations] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [statusFilter, setStatusFilter] = React.useState(initialStatus);
   const [error, setError] = React.useState(null);
   const [refreshIndex, setRefreshIndex] = React.useState(0);
 
@@ -16,8 +21,11 @@ export default function AdminAutomationsPage() {
     let ignore = false;
 
     async function loadAutomations() {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch("/api/admin/automations");
+        const url = statusFilter ? `/api/admin/automations?status=${statusFilter}` : "/api/admin/automations";
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load automations.");
         const data = await res.json();
         if (!ignore) {
@@ -37,10 +45,9 @@ export default function AdminAutomationsPage() {
     return () => {
       ignore = true;
     };
-  }, [refreshIndex]);
+  }, [statusFilter, refreshIndex]);
 
   const handleRefresh = () => {
-    setLoading(true);
     setRefreshIndex((prev) => prev + 1);
   };
 
@@ -57,20 +64,32 @@ export default function AdminAutomationsPage() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="text-xs self-start sm:self-auto min-h-[44px] sm:min-h-[36px]"
-        >
-          {loading ? (
-            <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5 mr-1.5" />
-          )}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-md border border-input bg-card px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[36px]"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
+          </select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="text-xs min-h-[36px]"
+          >
+            {loading ? (
+              <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5 mr-1.5" />
+            )}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -88,14 +107,14 @@ export default function AdminAutomationsPage() {
             Configured Automations ({automations.length})
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            Automations execute exclusively when an eligible comment triggers a DM sequence.
+            Automations execute exclusively when an eligible Instagram comment triggers a requirement-gathering DM sequence.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 pt-0">
+        <CardContent className="p-0">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-xs text-muted-foreground">
               <Loader2 className="size-5 animate-spin text-primary-accent mb-2" />
-              <span>Loading automations...</span>
+              <span>Querying database for workflows...</span>
             </div>
           ) : automations.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
@@ -106,29 +125,68 @@ export default function AdminAutomationsPage() {
                 No Workspace Automations Active
               </h3>
               <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
-                Customer workspaces have not activated any automated comment-to-DM triggers yet. As customers connect Instagram Business accounts and build requirement sequences, their workflows will register here.
+                Customer workspaces have not activated any automated comment-to-DM triggers matching the current filter.
               </p>
               <div className="pt-2">
                 <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
-                  State: Zero Active Automations
+                  State: Zero Configured Automations
                 </Badge>
               </div>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {automations.map((a) => (
-                <div key={a.id} className="py-3 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">{a.name}</p>
-                    <p className="text-[11px] text-muted-foreground">Org: {a.organizationName}</p>
+              {automations.map((a) => {
+                const isActive = a.status === "active";
+                return (
+                  <div key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-muted/30 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-foreground">{a.name}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] uppercase font-bold py-0 ${
+                            isActive ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : ""
+                          }`}
+                        >
+                          {a.status}
+                        </Badge>
+                        {a.organization_name && (
+                          <span className="text-[10px] text-muted-foreground">
+                            Workspace: {a.organization_name}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Trigger: <strong className="text-foreground">{a.trigger_keyword || a.triggerKeyword || "Any"}</strong> • Reply: &ldquo;{a.reply_text || a.replyText || "Automated response"}&rdquo;
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-muted-foreground text-[10px] font-mono shrink-0">
+                      <Calendar className="size-3" />
+                      <span>{a.created_at ? new Date(a.created_at).toLocaleDateString() : "Active"}</span>
+                    </div>
                   </div>
-                  <Badge variant="outline">{a.status}</Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AdminAutomationsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mb-2" />
+          <p className="text-sm">Loading automations...</p>
+        </div>
+      }
+    >
+      <AutomationsContent />
+    </React.Suspense>
   );
 }

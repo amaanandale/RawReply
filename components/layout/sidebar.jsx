@@ -3,13 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircle, ShieldCheck } from "lucide-react";
+import { MessageCircle, ShieldCheck, Shield } from "lucide-react";
 import { DASHBOARD_NAV_ITEMS } from "@/config/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/shared/auth-provider";
 
 export function DashboardSidebar({ isOpen, onClose }) {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   return (
     <>
@@ -50,6 +52,23 @@ export function DashboardSidebar({ isOpen, onClose }) {
             SaaS
           </span>
         </div>
+
+        {/* Super Admin Back to Admin Option */}
+        {user?.isSuperAdmin && (
+          <div className="p-2.5 bg-primary-accent/5 border-b border-primary-accent/20">
+            <Link
+              href="/admin"
+              onClick={onClose}
+              className="flex items-center justify-between w-full rounded-md border border-primary-accent/30 bg-primary-accent/10 px-2.5 py-1.5 text-xs font-semibold text-primary-accent hover:bg-primary-accent/20 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Shield className="size-3.5" />
+                Back to Super Admin
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider">Admin</span>
+            </Link>
+          </div>
+        )}
 
         {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
