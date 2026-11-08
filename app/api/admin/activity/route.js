@@ -10,13 +10,14 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action") || undefined;
     const targetType = searchParams.get("targetType") || undefined;
+    const search = searchParams.get("search") || undefined;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10)));
     const offset = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([
-      db.listAuditLogs({ limit, offset, action, targetType }),
-      db.countAuditLogs({ action, targetType }),
+      db.listAuditLogs({ limit, offset, action, targetType, search }),
+      db.countAuditLogs({ action, targetType, search }),
     ]);
 
     return NextResponse.json({

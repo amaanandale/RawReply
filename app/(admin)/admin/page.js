@@ -12,6 +12,10 @@ import {
   AlertTriangle,
   RefreshCw,
   Loader2,
+  PhoneCall,
+  MessageSquare,
+  LogIn,
+  AlertOctagon,
 } from "lucide-react";
 import { Instagram } from "@/components/shared/icons";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -78,11 +82,11 @@ export default function AdminOverviewPage() {
               Super Admin Control Plane
             </h1>
             <Badge variant="outline" className="text-[10px] uppercase font-bold text-primary-accent border-primary-accent/30">
-              Live
+              Database-Backed
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            System overview, customer workspaces, and compliance governance.
+            System overview, customer workspaces, authentication monitoring and platform health.
           </p>
         </div>
 
@@ -111,26 +115,33 @@ export default function AdminOverviewPage() {
 
       {/* Primary Metrics Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Customers */}
         <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-medium text-muted-foreground">
-              Total Customers
+            <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+              <span>Customers</span>
+              <Users className="size-3.5 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {metrics ? metrics.totalCustomers : "—"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <span className="text-emerald-600 font-semibold">{metrics ? metrics.activeCustomers : 0} active</span>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-2">
+              <span className="text-emerald-600 font-semibold">{metrics?.activeCustomers ?? 0} active</span>
+              {Boolean(metrics?.suspendedCustomers) && (
+                <span className="text-destructive font-medium">{metrics.suspendedCustomers} suspended</span>
+              )}
             </p>
           </CardContent>
         </Card>
 
+        {/* Organizations */}
         <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-medium text-muted-foreground">
-              Organizations
+            <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+              <span>Organizations</span>
+              <Building2 className="size-3.5 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {metrics ? metrics.totalOrganizations : "—"}
@@ -138,39 +149,121 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-[11px] text-muted-foreground">
-              Multi-tenant workspaces
+              Multi-tenant customer workspaces
             </p>
           </CardContent>
         </Card>
 
+        {/* Instagram Accounts */}
         <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-medium text-muted-foreground">
-              Instagram Integrations
+            <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+              <span>Instagram Integrations</span>
+              <Instagram className="size-3.5 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
-              {metrics ? metrics.totalIntegrations : "—"}
+              {metrics ? metrics.connectedAccounts ?? metrics.activeIntegrations ?? 0 : "—"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-[11px] text-muted-foreground">
-              {metrics ? metrics.activeIntegrations : 0} connected
+              <span className="text-emerald-600 font-semibold">{metrics?.connectedAccounts ?? 0} connected</span>
+              {Boolean(metrics?.disconnectedAccounts) && (
+                <span className="text-muted-foreground ml-1.5">({metrics.disconnectedAccounts} disconnected)</span>
+              )}
             </p>
           </CardContent>
         </Card>
 
+        {/* Captured Leads */}
         <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-medium text-muted-foreground">
-              Audit Log Events
+            <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+              <span>Captured Leads</span>
+              <PhoneCall className="size-3.5 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
-              {metrics ? metrics.totalAuditLogs : "—"}
+              {metrics ? metrics.totalCapturedLeads : "—"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-[11px] text-muted-foreground">
-              Immutable security records
+              Verified mobile phone qualification gate
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Secondary Metrics: Conversations, Comments, Logins & Errors */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Conversations & Messages */}
+        <Card className="border border-border bg-card shadow-xs">
+          <CardHeader className="p-3 pb-1">
+            <CardDescription className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+              <MessageSquare className="size-3" />
+              Conversations
+            </CardDescription>
+            <CardTitle className="text-xl font-bold text-foreground">
+              {metrics ? metrics.totalConversations : 0}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <p className="text-[10px] text-muted-foreground">
+              {metrics ? metrics.totalComments : 0} comments processed
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Authentication Success */}
+        <Card className="border border-border bg-card shadow-xs">
+          <CardHeader className="p-3 pb-1">
+            <CardDescription className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+              <LogIn className="size-3 text-emerald-600" />
+              Successful Logins
+            </CardDescription>
+            <CardTitle className="text-xl font-bold text-foreground text-emerald-600">
+              {metrics ? metrics.successfulLogins : 0}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <p className="text-[10px] text-muted-foreground">
+              Verified sessions created
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Failed Login Attempts */}
+        <Card className="border border-border bg-card shadow-xs">
+          <CardHeader className="p-3 pb-1">
+            <CardDescription className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+              <AlertTriangle className="size-3 text-amber-600" />
+              Failed Logins
+            </CardDescription>
+            <CardTitle className="text-xl font-bold text-foreground">
+              {metrics ? metrics.failedLogins : 0}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <p className="text-[10px] text-muted-foreground">
+              Security anomalies logged
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* System Errors */}
+        <Card className="border border-border bg-card shadow-xs">
+          <CardHeader className="p-3 pb-1">
+            <CardDescription className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+              <AlertOctagon className="size-3 text-destructive" />
+              System Errors
+            </CardDescription>
+            <CardTitle className="text-xl font-bold text-foreground">
+              {metrics ? metrics.systemErrors : 0}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <p className="text-[10px] text-muted-foreground">
+              {metrics ? metrics.totalAuditLogs : 0} total audit records
             </p>
           </CardContent>
         </Card>
@@ -190,27 +283,27 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="p-4 pt-0 space-y-3">
             <div className="flex items-center justify-between text-xs py-1.5 border-b border-border/60">
-              <span className="text-muted-foreground">JWT Session Guard</span>
-              <span className="flex items-center gap-1 font-medium text-emerald-600">
-                <CheckCircle2 className="size-3.5" /> Active
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs py-1.5 border-b border-border/60">
               <span className="text-muted-foreground">Database Storage</span>
               <span className="flex items-center gap-1 font-medium text-emerald-600">
-                <CheckCircle2 className="size-3.5" /> Connected
+                <CheckCircle2 className="size-3.5" /> PostgreSQL
               </span>
             </div>
             <div className="flex items-center justify-between text-xs py-1.5 border-b border-border/60">
-              <span className="text-muted-foreground">Instagram Webhooks</span>
+              <span className="text-muted-foreground">JWT Session Guard</span>
               <span className="flex items-center gap-1 font-medium text-emerald-600">
-                <CheckCircle2 className="size-3.5" /> HMAC-SHA256
+                <CheckCircle2 className="size-3.5" /> Active (HS256)
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs py-1.5 border-b border-border/60">
+              <span className="text-muted-foreground">Instagram Unified Login</span>
+              <span className="flex items-center gap-1 font-medium text-emerald-600">
+                <CheckCircle2 className="size-3.5" /> Config ID 1106955532119603
               </span>
             </div>
             <div className="flex items-center justify-between text-xs py-1.5">
-              <span className="text-muted-foreground">Audit Log Ingestion</span>
+              <span className="text-muted-foreground">Webhook Verification</span>
               <span className="flex items-center gap-1 font-medium text-emerald-600">
-                <CheckCircle2 className="size-3.5" /> Operational
+                <CheckCircle2 className="size-3.5" /> HMAC-SHA256
               </span>
             </div>
           </CardContent>
@@ -246,13 +339,13 @@ export default function AdminOverviewPage() {
                   <div key={log.id || `log-${log.created_at || index}-${index}`} className="py-2.5 flex items-start justify-between gap-3 text-xs">
                     <div>
                       <p className="font-medium text-foreground capitalize">
-                        {log.action.replace(/_/g, " ")}
+                        {log.action?.replace(/_/g, " ")}
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Target: <span className="font-mono">{log.target_type || "system"}</span> ({log.target_id || "global"})
+                        By {log.actor_email} • Target: {log.target_type} ({log.target_id || "global"})
                       </p>
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                       {new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
@@ -261,51 +354,6 @@ export default function AdminOverviewPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Link
-          href="/admin/customers"
-          className="rounded-lg border border-border bg-card p-4 transition-all hover:border-primary-accent/50 hover:shadow-xs group min-h-[44px]"
-        >
-          <div className="flex items-center justify-between">
-            <Users className="size-5 text-primary-accent" />
-            <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary-accent transition-colors" />
-          </div>
-          <h3 className="mt-3 text-sm font-semibold text-foreground">Manage Customers</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Search, inspect, and suspend or reactivate customer accounts.
-          </p>
-        </Link>
-
-        <Link
-          href="/admin/organizations"
-          className="rounded-lg border border-border bg-card p-4 transition-all hover:border-primary-accent/50 hover:shadow-xs group min-h-[44px]"
-        >
-          <div className="flex items-center justify-between">
-            <Building2 className="size-5 text-primary-accent" />
-            <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary-accent transition-colors" />
-          </div>
-          <h3 className="mt-3 text-sm font-semibold text-foreground">Manage Workspaces</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Inspect customer organizations, team owners, and member counts.
-          </p>
-        </Link>
-
-        <Link
-          href="/admin/integrations"
-          className="rounded-lg border border-border bg-card p-4 transition-all hover:border-primary-accent/50 hover:shadow-xs group min-h-[44px]"
-        >
-          <div className="flex items-center justify-between">
-            <Instagram className="size-5 text-primary-accent" />
-            <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary-accent transition-colors" />
-          </div>
-          <h3 className="mt-3 text-sm font-semibold text-foreground">Connected Instagram Accounts</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Monitor real Instagram business accounts connected across workspaces.
-          </p>
-        </Link>
       </div>
     </div>
   );

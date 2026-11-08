@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Activity,
   Search,
@@ -179,10 +180,29 @@ export default function AdminActivityPage() {
                             {log.target_type || "system"}
                           </Badge>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Actor: <span className="font-mono">{log.performed_by || "system"}</span>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <span>Actor: <strong className="font-mono text-foreground">{log.actor_email || log.performed_by || "system"}</strong></span>
                           {log.target_id && (
-                            <> &rarr; Target: <span className="font-mono">{log.target_id}</span></>
+                            <>
+                              <span>&rarr; Target:</span>
+                              {log.target_type === "user" || log.target_id?.startsWith("usr_") ? (
+                                <Link
+                                  href={`/admin/customers/${log.target_id}`}
+                                  className="font-mono text-primary-accent hover:underline"
+                                >
+                                  {log.target_id}
+                                </Link>
+                              ) : log.target_type === "organization" || log.target_id?.startsWith("org_") ? (
+                                <Link
+                                  href={`/admin/organizations`}
+                                  className="font-mono text-primary-accent hover:underline"
+                                >
+                                  {log.target_id}
+                                </Link>
+                              ) : (
+                                <span className="font-mono text-foreground">{log.target_id}</span>
+                              )}
+                            </>
                           )}
                         </p>
                       </div>

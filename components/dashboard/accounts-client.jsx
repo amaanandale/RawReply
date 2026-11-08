@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export function AccountsClient({ initialAccounts, isConfigured = false }) {
+export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = React.useState(initialAccounts || []);
@@ -124,20 +124,25 @@ export function AccountsClient({ initialAccounts, isConfigured = false }) {
       )}
 
       {errorParam && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">
-          <AlertCircle className="size-4 shrink-0 text-red-600 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-900">
-              {errorParam === "missing_configuration"
-                ? "Configuration Missing"
-                : errorParam === "forbidden"
-                ? "Access Denied"
-                : "Connection Failed"}
-            </p>
-            <p className="mt-0.5 text-red-700">
-              {messageParam || "An error occurred during Meta authorization."}
-            </p>
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="size-4 shrink-0 text-red-600 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-900">
+                {errorParam === "missing_configuration"
+                  ? "Configuration Missing"
+                  : errorParam === "forbidden"
+                  ? "Access Denied"
+                  : "Connection Failed"}
+              </p>
+              <p className="mt-0.5 text-red-700">
+                {messageParam || "An error occurred during Meta authorization."}
+              </p>
+            </div>
           </div>
+          <Button size="xs" variant="outline" asChild className="shrink-0 bg-white hover:bg-red-50">
+            <a href="/api/auth/meta/authorize">Connect Now</a>
+          </Button>
         </div>
       )}
 

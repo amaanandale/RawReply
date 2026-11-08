@@ -1,15 +1,19 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Users,
   Search,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Loader2,
   RefreshCw,
   Building,
+  ChevronRight,
+  ChevronLeft,
+  Calendar,
+  Clock,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +24,9 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(1);
+  const [totalCount, setTotalCount] = React.useState(0);
   const [actionLoading, setActionLoading] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [successMsg, setSuccessMsg] = React.useState(null);
@@ -31,17 +38,23 @@ export default function AdminCustomersPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
+      params.set("page", String(page));
+      params.set("limit", "15");
 
       const res = await fetch(`/api/admin/customers?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load customers.");
       const data = await res.json();
       setCustomers(data.customers || []);
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages || 1);
+        setTotalCount(data.pagination.total || 0);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, page]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -50,7 +63,8 @@ export default function AdminCustomersPage() {
     return () => clearTimeout(timer);
   }, [fetchCustomers]);
 
-  const handleStatusChange = async (userId, targetStatus) => {
+  const handleStatusChange = async (userId, targetStatus, e) => {
+    if (e) e.stopPropagation();
     setActionLoading(userId);
     setError(null);
     setSuccessMsg(null);
@@ -128,7 +142,10 @@ export default function AdminCustomersPage() {
             type="text"
             placeholder="Search by customer name or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full rounded-md border border-input bg-card pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[44px] sm:min-h-[38px]"
           />
         </div>
@@ -136,7 +153,10 @@ export default function AdminCustomersPage() {
         <div className="flex gap-2">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             aria-label="Filter customers by status"
             className="rounded-md border border-input bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[44px] sm:min-h-[38px]"
           >
@@ -149,14 +169,16 @@ export default function AdminCustomersPage() {
 
       {/* Customers List */}
       <Card className="border border-border bg-card shadow-xs">
-        <CardHeader className="p-4 pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Users className="size-4 text-primary-accent" />
-            Registered Customers ({customers.length})
-          </CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">
-            Platform accounts and their current workspace privileges.
-          </CardDescription>
+        <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Users className="size-4 text-primary-accent" />
+              Registered Customers ({totalCount})
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Click any customer row to view their complete profile, workspaces, integrations and activity.
+            </CardDescription>
+          </div>
         </CardHeader>
 
         <CardContent className="p-0">
@@ -178,11 +200,11 @@ export default function AdminCustomersPage() {
                 return (
                   <div
                     key={c.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/40 transition-colors cursor-pointer group"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-xs text-foreground">
+                    <Link href={`/admin/customers/${c.id}`} className="space-y-1.5 flex-1 block">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-xs text-foreground group-hover:text-primary-accent transition-colors">
                           {c.name || "Unnamed User"}
                         </span>
                         {isSuperAdmin && (
@@ -200,7 +222,20 @@ export default function AdminCustomersPage() {
                         </Badge>
                       </div>
 
-                      <p className="text-xs text-muted-foreground">{c.email}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{c.email}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="size-3" />
+                          Joined: {new Date(c.created_at).toLocaleDateString()}
+                        </span>
+                        {c.last_login_at && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="size-3" />
+                            Last login: {new Date(c.last_login_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Workspaces */}
                       {c.organizations && c.organizations.length > 0 && (
@@ -222,10 +257,17 @@ export default function AdminCustomersPage() {
                           })}
                         </div>
                       )}
-                    </div>
+                    </Link>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <Button variant="ghost" size="sm" asChild className="text-xs h-8">
+                        <Link href={`/admin/customers/${c.id}`} className="flex items-center gap-1">
+                          <span>Details</span>
+                          <ChevronRight className="size-3.5" />
+                        </Link>
+                      </Button>
+
                       {!isSuperAdmin && (
                         <>
                           {isSuspended ? (
@@ -233,8 +275,8 @@ export default function AdminCustomersPage() {
                               variant="outline"
                               size="sm"
                               disabled={actionLoading === c.id}
-                              onClick={() => handleStatusChange(c.id, "active")}
-                              className="text-xs h-8 text-emerald-700 border-emerald-500/30 hover:bg-emerald-50 min-h-[44px] sm:min-h-[32px]"
+                              onClick={(e) => handleStatusChange(c.id, "active", e)}
+                              className="text-xs h-8 text-emerald-700 border-emerald-500/30 hover:bg-emerald-50 min-h-[36px]"
                             >
                               {actionLoading === c.id ? (
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -248,13 +290,13 @@ export default function AdminCustomersPage() {
                               variant="outline"
                               size="sm"
                               disabled={actionLoading === c.id}
-                              onClick={() => handleStatusChange(c.id, "suspended")}
-                              className="text-xs h-8 text-destructive border-destructive/30 hover:bg-destructive/10 min-h-[44px] sm:min-h-[32px]"
+                              onClick={(e) => handleStatusChange(c.id, "suspended", e)}
+                              className="text-xs h-8 text-destructive border-destructive/30 hover:bg-destructive/10 min-h-[36px]"
                             >
                               {actionLoading === c.id ? (
                                 <Loader2 className="size-3.5 animate-spin" />
                               ) : (
-                                <XCircle className="size-3.5 mr-1" />
+                                <AlertTriangle className="size-3.5 mr-1" />
                               )}
                               Suspend
                             </Button>
@@ -268,8 +310,36 @@ export default function AdminCustomersPage() {
             </div>
           )}
         </CardContent>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || loading}
+                className="h-8 text-xs"
+              >
+                <ChevronLeft className="size-3.5 mr-1" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || loading}
+                className="h-8 text-xs"
+              >
+                Next <ChevronRight className="size-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
 }
-

@@ -7,6 +7,13 @@ import {
   validateOAuthState,
 } from "../lib/crypto/encryption.js";
 import {
+  generateSecureOAuthState,
+  buildMetaUnifiedLoginUrl,
+  validateAndConsumeOAuthState,
+  oauthStateStore,
+  STATE_COOKIE_NAME,
+} from "../lib/meta/oauth-state.js";
+import {
   verifyWebhookSignature,
   normalizeWebhookEvents,
 } from "../lib/meta/webhooks.js";
@@ -333,7 +340,10 @@ async function runTests() {
     });
 
     const fullAuthUrl = `${META_OAUTH_DIALOG_URL}?${params.toString()}`;
-    assert.ok(fullAuthUrl.startsWith("https://www.facebook.com/v21.0/dialog/oauth"));
+    assert.ok(
+      fullAuthUrl.startsWith("https://www.facebook.com/dialog/oauth") ||
+      fullAuthUrl.startsWith("https://www.facebook.com/v21.0/dialog/oauth")
+    );
     assert.ok(fullAuthUrl.includes("client_id=123456789012345"));
     assert.ok(fullAuthUrl.includes("response_type=code"));
     assert.ok(fullAuthUrl.includes("instagram_manage_comments"));
@@ -348,6 +358,171 @@ async function runTests() {
     assert.strictEqual(isConfigured("app_id", undefined), false);
     assert.strictEqual(isConfigured(undefined, "app_secret"), false);
     assert.strictEqual(isConfigured("app_id", "app_secret"), true);
+  });
+
+  // ─── 8. Meta Instagram Unified Login & Secure State Verification ────
+  await asyncTest("Unified Login: Valid state generation and validation succeeds", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    // Verify cryptographic properties: at least 32 random bytes (base64url is 43+ chars)
+    assert.ok(state.length >= 43);
+    assert.ok(!state.includes("+") && !state.includes("/")); // standard base64url
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionOrgId: "org_alpha",
+      sessionUser: { id: "user_owner" },
+    });
+
+    assert.strictEqual(result.valid, true);
+    assert.strictEqual(result.organizationId, "org_alpha");
+    assert.strictEqual(result.userId, "user_owner");
+  });
+
+  await asyncTest("Unified Login: Missing state parameter is rejected", async () => {
+    const { cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: null,
+      cookieValue,
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "missing_state");
+  });
+
+  await asyncTest("Unified Login: Missing state cookie is rejected", async () => {
+    const { state } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue: null,
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "missing_state_cookie");
+  });
+
+  await asyncTest("Unified Login: Mismatched state parameter is rejected", async () => {
+    const { cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    const bogusState = crypto.randomBytes(32).toString("base64url");
+    const result = await validateAndConsumeOAuthState({
+      stateParam: bogusState,
+      cookieValue,
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "mismatched_state");
+  });
+
+  await asyncTest("Unified Login: Expired state is rejected", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+      ttlMs: -1000, // Expired immediately
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "expired_state");
+  });
+
+  await asyncTest("Unified Login: Reused state is strictly rejected (replay attack prevention)", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    // First consumption succeeds
+    const firstAttempt = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionOrgId: "org_alpha",
+    });
+    assert.strictEqual(firstAttempt.valid, true);
+
+    // Second consumption with exact same state and cookie MUST be rejected
+    const secondAttempt = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionOrgId: "org_alpha",
+    });
+    assert.strictEqual(secondAttempt.valid, false);
+    assert.strictEqual(secondAttempt.code, "reused_state");
+  });
+
+  await asyncTest("Unified Login: Unauthorized user is rejected", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionUser: { id: "user_attacker" },
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "unauthorized_user");
+  });
+
+  await asyncTest("Unified Login: Organization isolation violation is rejected", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_alpha",
+      userId: "user_owner",
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionOrgId: "org_beta", // Mismatched organization
+    });
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.code, "unauthorized_organization");
+  });
+
+  test("Unified Login: Authorization URL construction compliance with URLSearchParams", () => {
+    const state = "test_secure_random_state_base64url_32bytes_min";
+    const authUrl = buildMetaUnifiedLoginUrl({
+      state,
+      clientId: "1531237922145783",
+      configId: "1106955532119603",
+      redirectUri: "https://rawreply-git-main-amaanandales-projects.vercel.app/api/auth/meta/callback",
+    });
+
+    assert.ok(authUrl.startsWith("https://www.facebook.com/dialog/oauth?"));
+    const url = new URL(authUrl);
+    assert.strictEqual(url.searchParams.get("client_id"), "1531237922145783");
+    assert.strictEqual(url.searchParams.get("config_id"), "1106955532119603");
+    assert.strictEqual(url.searchParams.get("display"), "popup");
+    assert.strictEqual(url.searchParams.get("override_default_response_type"), "true");
+    assert.strictEqual(url.searchParams.get("response_type"), "code");
+    assert.strictEqual(url.searchParams.get("prompt"), "login");
+    assert.strictEqual(url.searchParams.get("state"), state);
+    assert.strictEqual(
+      url.searchParams.get("redirect_uri"),
+      "https://rawreply-git-main-amaanandales-projects.vercel.app/api/auth/meta/callback"
+    );
   });
 
 

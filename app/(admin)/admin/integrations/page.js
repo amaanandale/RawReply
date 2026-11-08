@@ -1,7 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, RefreshCw, Loader2, ShieldCheck, Building } from "lucide-react";
+import Link from "next/link";
+import {
+  AlertCircle,
+  RefreshCw,
+  Loader2,
+  ShieldCheck,
+  Building,
+  User,
+  Calendar,
+  Clock,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 import { Instagram } from "@/components/shared/icons";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,10 +64,10 @@ export default function AdminIntegrationsPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-            Instagram Integrations
+            Instagram Integrations Monitoring
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Real Instagram Business and Creator accounts linked to tenant workspaces via Meta Graph API.
+            Database-backed Instagram Professional accounts linked via Meta Unified Login.
           </p>
         </div>
 
@@ -97,7 +110,7 @@ export default function AdminIntegrationsPage() {
             Connected Instagram Accounts ({integrations.length})
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            Live integrations receiving comment and messaging webhook events.
+            Real Instagram Business and Creator profiles active on RawReply.
           </CardDescription>
         </CardHeader>
 
@@ -121,38 +134,107 @@ export default function AdminIntegrationsPage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {integrations.map((account) => (
-                <div
-                  key={account.id}
-                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-xs text-foreground">
-                        @{account.username || account.name}
-                      </span>
-                      <Badge variant="outline" className="text-[10px] text-emerald-700 bg-emerald-500/10 border-emerald-500/20 py-0">
-                        {account.status || "connected"}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px] font-mono py-0">
-                        {account.accountType || "BUSINESS"}
-                      </Badge>
-                    </div>
+              {integrations.map((account) => {
+                const isConnected = account.status === "connected";
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-0.5">
-                      <span className="flex items-center gap-1">
-                        <Building className="size-3 text-muted-foreground" />
-                        Workspace: <strong className="text-foreground font-medium">{account.organizationName}</strong>
-                      </span>
-                      <span>Page: {account.pageName || account.pageId || "Default"}</span>
+                return (
+                  <div
+                    key={account.id}
+                    className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-foreground">
+                          @{account.username || account.name}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] font-semibold py-0 uppercase ${
+                            isConnected
+                              ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20"
+                              : "text-destructive border-destructive/20"
+                          }`}
+                        >
+                          {account.status || "connected"}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] font-mono py-0">
+                          {account.accountType || "BUSINESS"}
+                        </Badge>
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          ID: {account.instagramAccountId}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-muted-foreground pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <User className="size-3 text-muted-foreground" />
+                          <span>Customer: </span>
+                          {account.customerId ? (
+                            <Link
+                              href={`/admin/customers/${account.customerId}`}
+                              className="font-medium text-foreground hover:underline"
+                            >
+                              {account.customerName}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-foreground">{account.customerName}</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Building className="size-3 text-muted-foreground" />
+                          <span>Workspace: </span>
+                          <strong className="text-foreground font-medium">{account.organizationName}</strong>
+                        </div>
+
+                        <div>
+                          <span>Linked Page: </span>
+                          <strong className="text-foreground font-medium">{account.pageName || account.pageId || "Default Page"}</strong>
+                        </div>
+                      </div>
+
+                      {/* Technical & Token Expiration Metadata */}
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-1">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="size-3" />
+                          Connected: {new Date(account.connectedAt).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="size-3" />
+                          Token Status:{" "}
+                          <span className="font-medium text-foreground">
+                            {account.tokenExpiresAt
+                              ? `Expires ${new Date(account.tokenExpiresAt).toLocaleDateString()}`
+                              : "60-Day Long-Lived Token"}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Activity className="size-3" />
+                          Last Activity:{" "}
+                          <span className="font-medium text-foreground">
+                            {account.lastActivityAt
+                              ? new Date(account.lastActivityAt).toLocaleDateString()
+                              : "Active"}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Error or Webhook Status */}
+                      {account.lastError ? (
+                        <div className="text-[11px] text-destructive flex items-center gap-1 pt-1">
+                          <AlertTriangle className="size-3 shrink-0" />
+                          <span>Last API Error: {account.lastError}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-emerald-600 flex items-center gap-1 pt-1">
+                          <CheckCircle2 className="size-3 shrink-0" />
+                          <span>Webhooks Verified (Subscribed to Feed & Messaging)</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="text-[11px] text-muted-foreground shrink-0 font-mono self-end sm:self-center">
-                    Connected: {account.connectedAt ? new Date(account.connectedAt).toLocaleDateString() : "—"}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

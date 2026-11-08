@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { accountStore } from "@/lib/storage/account-store";
 import { AccountsClient } from "@/components/dashboard/accounts-client";
+import { META_DEFAULT_APP_ID, META_DEFAULT_APP_SECRET } from "@/lib/meta/constants";
 
 export const metadata = {
   title: "Instagram Accounts — RawReply",
@@ -27,7 +28,8 @@ async function AccountsDataWrapper() {
   }
 
   const isConfigured = Boolean(
-    process.env.META_APP_ID && process.env.META_APP_SECRET
+    (process.env.META_APP_ID || META_DEFAULT_APP_ID) &&
+    (process.env.META_APP_SECRET || META_DEFAULT_APP_SECRET)
   );
 
   const accounts = await accountStore.listAccounts(organizationId);

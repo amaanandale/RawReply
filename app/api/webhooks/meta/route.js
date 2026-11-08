@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyWebhookSignature, normalizeWebhookEvents } from "@/lib/meta/webhooks";
 import { durableEventStore } from "@/lib/events/durable-store";
+import { logSystemError, ERROR_CATEGORIES, ERROR_SEVERITIES } from "@/lib/monitoring/error-logger";
 
 /**
  * GET /api/webhooks/meta
@@ -77,6 +78,12 @@ export async function POST(req) {
   });
 
   if (!isValid) {
+    await logSystemError({
+      category: ERROR_CATEGORIES.INSTAGRAM_WEBHOOK,
+      severity: ERROR_SEVERITIES.WARN,
+      endpoint: "/api/webhooks/meta",
+      error: "Invalid Meta webhook signature header",
+    });
     console.warn(
       JSON.stringify({
         level: "warn",

@@ -5,6 +5,7 @@ import {
   Layers,
   UserCheck,
   Settings,
+  Activity,
 } from "lucide-react";
 import { Instagram } from "@/components/shared/icons";
 
@@ -46,6 +47,12 @@ export const DASHBOARD_NAV_ITEMS = [
     title: "Team Members",
     href: "/dashboard/team",
     icon: UserCheck,
+    exact: false,
+  },
+  {
+    title: "Activity & Issues",
+    href: "/dashboard/activity",
+    icon: Activity,
     exact: false,
   },
   {

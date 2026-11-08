@@ -5,6 +5,7 @@ import { generateRandomToken, hashToken } from "../lib/auth/tokens.js";
 import { createSession, revokeSession, revokeAllUserSessions } from "../lib/auth/session.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../lib/email/client.js";
 import { ROLES } from "../lib/constants.js";
+import { trackLoginEvent, LOGIN_EVENT_TYPES } from "../lib/monitoring/login-tracker.js";
 
 function generateId(prefix) {
   return `${prefix}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
@@ -118,24 +119,73 @@ export const authService = {
     const user = await db.findUserByEmail(normalizedEmail);
 
     if (!user) {
+      await trackLoginEvent({
+        email: normalizedEmail,
+        eventType: LOGIN_EVENT_TYPES.INVALID_CREDENTIALS,
+        status: "failure",
+        safeErrorCode: "user_not_found",
+        safeErrorDescription: "Invalid email or password",
+        userAgent,
+        ipAddress,
+      });
       throw new Error("Invalid email or password.");
     }
 
     if (user.status === "suspended") {
+      await trackLoginEvent({
+        userId: user.id,
+        email: normalizedEmail,
+        eventType: LOGIN_EVENT_TYPES.ACCOUNT_SUSPENDED,
+        status: "failure",
+        safeErrorCode: "account_suspended",
+        safeErrorDescription: "Your account has been suspended",
+        userAgent,
+        ipAddress,
+      });
       throw new Error("Your account has been suspended. Please contact support.");
     }
 
     if (user.status !== "active") {
+      await trackLoginEvent({
+        userId: user.id,
+        email: normalizedEmail,
+        eventType: LOGIN_EVENT_TYPES.AUTH_ERROR,
+        status: "failure",
+        safeErrorCode: "account_inactive",
+        safeErrorDescription: "This account is not active",
+        userAgent,
+        ipAddress,
+      });
       throw new Error("This account is not active. Please contact support.");
     }
 
     const isMatch = await comparePassword(password, user.password_hash);
     if (!isMatch) {
+      await trackLoginEvent({
+        userId: user.id,
+        email: normalizedEmail,
+        eventType: LOGIN_EVENT_TYPES.INVALID_CREDENTIALS,
+        status: "failure",
+        safeErrorCode: "password_mismatch",
+        safeErrorDescription: "Invalid email or password",
+        userAgent,
+        ipAddress,
+      });
       throw new Error("Invalid email or password.");
     }
 
     const sessionResult = await createSession({
       userId: user.id,
+      userAgent,
+      ipAddress,
+    });
+
+    await trackLoginEvent({
+      userId: user.id,
+      organizationId: sessionResult.session?.active_organization_id,
+      email: normalizedEmail,
+      eventType: LOGIN_EVENT_TYPES.LOGIN_SUCCESS,
+      status: "success",
       userAgent,
       ipAddress,
     });

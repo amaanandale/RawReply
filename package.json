@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/test-auth-integration.mjs && node scripts/test-meta-integration.mjs && node scripts/test-super-admin.mjs && node scripts/test-leads-excel.mjs"
+    "migrate": "node scripts/migrate.js",
+    "test": "node scripts/test-auth-integration.mjs && node scripts/test-meta-integration.mjs && node scripts/test-super-admin.mjs && node scripts/test-leads-excel.mjs && node scripts/test-database-superadmin.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
