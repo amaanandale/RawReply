@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyWebhookSignature, normalizeWebhookEvents } from "@/lib/meta/webhooks";
 import { durableEventStore } from "@/lib/events/durable-store";
 import { logSystemError, ERROR_CATEGORIES, ERROR_SEVERITIES } from "@/lib/monitoring/error-logger";
+import { processIncomingComment, processIncomingMessage } from "@/lib/meta/automation-runner";
 
 /**
  * GET /api/webhooks/meta
@@ -48,7 +49,8 @@ export async function GET(req) {
 /**
  * POST /api/webhooks/meta
  * Official Meta Webhook event receiver.
- * Enforces HMAC-SHA256 signature verification and durable event acceptance.
+ * Enforces HMAC-SHA256 signature verification, durable event acceptance,
+ * and live execution of active comment-to-DM automations.
  */
 export async function POST(req) {
   const signatureHeader = req.headers.get("x-hub-signature-256");
@@ -117,10 +119,11 @@ export async function POST(req) {
   // Normalize incoming event entries
   const events = normalizeWebhookEvents(payload);
 
-  // Durably accept each event before acknowledging receipt to Meta
+  // Durably accept and process each event
   for (const event of events) {
+    let ingestResult = null;
     try {
-      await durableEventStore.ingestEvent(event);
+      ingestResult = await durableEventStore.ingestEvent(event);
     } catch (ingestErr) {
       console.error(
         JSON.stringify({
@@ -131,15 +134,52 @@ export async function POST(req) {
           eventId: event.id,
         })
       );
-      // If durable ingestion fails, return 500 so Meta will retry delivery
       return NextResponse.json(
         { error: "Failed to durably store webhook event" },
         { status: 500 }
       );
     }
+
+    // Skip processing if this event was already ingested and deduplicated
+    if (ingestResult?.duplicate) {
+      continue;
+    }
+
+    // Process event downstream
+    try {
+      if (event.type === "instagram_comment") {
+        await processIncomingComment({
+          commentId: event.data?.commentId,
+          postId: event.data?.postId,
+          text: event.data?.text,
+          commenterId: event.data?.from?.id,
+          commenterUsername: event.data?.from?.username,
+          accountId: event.accountId,
+        });
+      } else if (event.type === "instagram_message") {
+        await processIncomingMessage({
+          mid: event.data?.mid,
+          senderId: event.data?.senderId,
+          recipientId: event.data?.recipientId,
+          text: event.data?.text,
+          accountId: event.accountId,
+        });
+      }
+
+      await durableEventStore.markProcessed(event.id);
+    } catch (processErr) {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          service: "MetaWebhook",
+          action: "event_processing_error",
+          error: processErr.message,
+          eventId: event.id,
+        })
+      );
+    }
   }
 
-  // Quick 200 acknowledgement as required by Meta webhook SLA (< 5s)
+  // Fast 200 acknowledgement as required by Meta webhook SLA (< 5s)
   return new Response("EVENT_RECEIVED", { status: 200 });
 }
-
