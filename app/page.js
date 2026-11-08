@@ -16,6 +16,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Instagram } from "@/components/shared/icons";
+import { ProductDemoVideo } from "@/components/landing/product-demo-video";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -227,40 +228,71 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── 3. How It Works ────────────────────────────────────────────── */}
-        <section id="how-it-works" className="border-t border-border bg-muted/30 py-20">
+        {/* ─── 3. How It Works (Product Demo Video) ────────────────────────── */}
+        <section id="how-it-works" className="border-t border-border bg-muted/30 py-20 md:py-28">
           <div className="mx-auto max-w-6xl px-6">
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary-accent">
-                Simple Three-Step Process
+            {/* Section Header */}
+            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                HOW IT WORKS
               </span>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                How RawReply Works
+              <h2 className="mt-2.5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl leading-tight">
+                From Instagram Comment to Automated Conversation.
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Convert passive Instagram commenters into verified sales leads in three predictable steps.
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed sm:text-base">
+                Connect your Instagram account, choose a post, configure your replies and let RawReply automate your conversations.
               </p>
             </div>
 
-            <div className="grid gap-8 md:grid-cols-3">
-              <StepCard
-                number="01"
-                icon={Instagram}
-                title="Connect Instagram"
-                description="Securely link your Instagram Business or Creator account using official Meta OAuth. No fragile scraping or unofficial logins."
-              />
-              <StepCard
-                number="02"
-                icon={Zap}
-                title="Automate Conversations"
-                description="RawReply triggers an immediate private DM reply whenever someone comments on your post, asking targeted qualification questions."
-              />
-              <StepCard
-                number="03"
-                icon={Users}
-                title="Collect Qualified Leads"
-                description="Only customers who provide a valid mobile number become qualified leads. These verified records are immediately synced to your spreadsheet."
-              />
+            {/* Primary Visual Element: 10-Second Product Demonstration Video */}
+            <ProductDemoVideo />
+
+            {/* Supporting Three-Step Information Below Video */}
+            <div className="mt-12 sm:mt-16 pt-10 border-t border-border/80 grid gap-8 sm:grid-cols-2 md:grid-cols-3">
+              {/* Step 1 */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 font-mono text-xs font-bold border border-emerald-500/20">
+                  01
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold tracking-wider uppercase text-foreground">
+                    CONNECT INSTAGRAM
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Securely connect your Instagram Business or Creator account through Meta authorization.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 font-mono text-xs font-bold border border-emerald-500/20">
+                  02
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold tracking-wider uppercase text-foreground">
+                    CONFIGURE AUTOMATION
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Choose your Instagram post, select the comment trigger and configure public replies and private DMs.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex items-start gap-3.5 sm:col-span-2 md:col-span-1">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 font-mono text-xs font-bold border border-emerald-500/20">
+                  03
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold tracking-wider uppercase text-foreground">
+                    ACTIVATE AND COLLECT
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Publish your automation and let RawReply handle incoming comment-triggered conversations and lead capture.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -580,23 +612,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function StepCard({ number, icon: Icon, title, description }) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-6 relative">
-      <span className="font-mono text-2xl font-extrabold text-primary-accent/30 absolute top-5 right-5">
-        {number}
-      </span>
-      <div className="flex size-10 items-center justify-center rounded-lg bg-primary-accent-light text-primary-accent mb-4">
-        <Icon className="size-5" />
-      </div>
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-        {description}
-      </p>
     </div>
   );
 }

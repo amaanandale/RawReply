@@ -10,29 +10,31 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-muted/20">
-      {/* Sidebar / Mobile Navigation Drawer */}
-      <DashboardSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {/* Main Column */}
-      <div className="flex flex-col lg:pl-60">
-        {/* Header */}
-        <DashboardHeader
-          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+      <React.Suspense fallback={null}>
+        {/* Sidebar / Mobile Navigation Drawer */}
+        <DashboardSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Content Area - pb-24 on mobile ensures clearance above bottom navigation */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
-          <div className="mx-auto max-w-6xl">
-            {children}
-          </div>
-        </main>
-      </div>
+        {/* Main Column */}
+        <div className="flex flex-col lg:pl-60">
+          {/* Header */}
+          <DashboardHeader
+            onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          />
 
-      {/* Mobile-First Bottom Navigation (390px viewport primary benchmark) */}
-      <MobileBottomNav onOpenMore={() => setSidebarOpen(true)} />
+          {/* Content Area - pb-24 on mobile ensures clearance above bottom navigation */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
+            <div className="mx-auto max-w-6xl">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        {/* Mobile-First Bottom Navigation (390px viewport primary benchmark) */}
+        <MobileBottomNav onOpenMore={() => setSidebarOpen(true)} />
+      </React.Suspense>
     </div>
   );
 }

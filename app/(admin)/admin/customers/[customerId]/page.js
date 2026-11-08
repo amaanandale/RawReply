@@ -23,9 +23,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-export default function CustomerDetailPage() {
+function CustomerDetailContent() {
   const params = useParams();
-  const customerId = params.customerId;
+  const customerId = params?.customerId;
   const router = useRouter();
 
   const [data, setData] = React.useState(null);
@@ -390,6 +390,21 @@ export default function CustomerDetailPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function CustomerDetailPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mb-2" />
+          <p className="text-sm">Loading customer details...</p>
+        </div>
+      }
+    >
+      <CustomerDetailContent />
+    </React.Suspense>
   );
 }
 
