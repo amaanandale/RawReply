@@ -57,3 +57,4 @@ CREATE INDEX IF NOT EXISTS idx_executions_automation ON automation_executions(au
 CREATE INDEX IF NOT EXISTS idx_executions_org ON automation_executions(organization_id);
 CREATE INDEX IF NOT EXISTS idx_executions_comment ON automation_executions(comment_id);
 CREATE INDEX IF NOT EXISTS idx_executions_created_at ON automation_executions(created_at DESC);
+
