@@ -16,6 +16,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") || "";
   const status = searchParams.get("status") || "";
+  const platform = searchParams.get("platform") || "";
   const automationId = searchParams.get("automationId") || "";
   const accountId = searchParams.get("accountId") || "";
   const startDate = searchParams.get("startDate") || "";
@@ -28,6 +29,7 @@ export async function GET(req) {
     const result = await leadStore.listLeads(session.organizationId, {
       search,
       status,
+      platform,
       automationId,
       accountId,
       startDate,

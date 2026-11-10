@@ -26,7 +26,7 @@ export const DASHBOARD_NAV_ITEMS = [
     exact: false,
   },
   {
-    title: "Instagram Accounts",
+    title: "Connected Accounts",
     href: "/dashboard/accounts",
     icon: Instagram,
     exact: false,

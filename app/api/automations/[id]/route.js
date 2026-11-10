@@ -32,18 +32,26 @@ export async function GET(req, { params }) {
 
     const account = accounts.find(
       (a) =>
+        a.id === automation.account_id ||
         a.id === automation.instagram_account_id ||
-        a.instagramBusinessId === automation.instagram_account_id
+        a.instagramBusinessId === automation.instagram_account_id ||
+        a.pageId === automation.instagram_account_id ||
+        a.facebookPageId === automation.instagram_account_id
     );
+
+    const effectivePlatform = automation.platform || account?.platform || "instagram";
 
     return NextResponse.json({
       success: true,
       automation: {
         id: automation.id,
         name: automation.name,
+        platform: effectivePlatform,
         organizationId: automation.organization_id,
-        instagramAccountId: automation.instagram_account_id,
-        instagramUsername: account?.username || null,
+        accountId: automation.account_id || automation.instagram_account_id,
+        instagramAccountId: automation.instagram_account_id || automation.account_id,
+        instagramUsername: account?.username || account?.pageName || account?.name || null,
+        accountName: account?.name || account?.pageName || account?.username || null,
         accountProfilePicture: account?.profilePictureUrl || null,
         postId: automation.post_id,
         postCaption: automation.post_caption,

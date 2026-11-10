@@ -84,6 +84,7 @@ export async function GET(req) {
   }
 
   const isPlatformScope = req.nextUrl.searchParams.get("scope") === "platform";
+  const platform = req.nextUrl.searchParams.get("platform") === "facebook" ? "facebook" : "instagram";
 
   let organizationId = session.organizationId;
   const userId = session.user.id;
@@ -118,7 +119,7 @@ export async function GET(req) {
       accountsUrl.searchParams.set("error", "limit_reached");
       accountsUrl.searchParams.set(
         "message",
-        `Maximum limit of ${MAX_INSTAGRAM_ACCOUNTS_PER_CUSTOMER} connected Instagram accounts reached. Please disconnect an existing account first.`
+        `Maximum limit of ${MAX_INSTAGRAM_ACCOUNTS_PER_CUSTOMER} connected accounts reached. Please disconnect an existing account first.`
       );
       return NextResponse.redirect(accountsUrl.toString());
     }
@@ -133,6 +134,7 @@ export async function GET(req) {
       organizationId,
       userId,
       redirectUri,
+      platform,
     });
 
   // 4. Safe structured logging (no secrets, authorization codes or tokens)
@@ -143,6 +145,7 @@ export async function GET(req) {
       action: "unified_login_flow_initiated",
       organizationId,
       userId,
+      platform,
       redirectUri,
       configId,
       timestamp: new Date().toISOString(),
@@ -156,6 +159,7 @@ export async function GET(req) {
     clientId: appId,
     configId,
     redirectUri,
+    platform,
   });
 
   // 6. Set HTTP-only, SameSite=lax cookie on redirect response

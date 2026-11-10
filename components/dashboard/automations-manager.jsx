@@ -28,7 +28,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
 } from "lucide-react";
-import { Instagram } from "@/components/shared/icons";
+import { Instagram, Facebook } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,8 @@ export function AutomationsManager() {
   const [automations, setAutomations] = React.useState([]);
   const [automationsLoading, setAutomationsLoading] = React.useState(false);
   const [automationSearch, setAutomationSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [statusFilter, setStatusFilter] = React.useState("all"); // 'all' | 'active' | 'paused'
+  const [platformFilter, setPlatformFilter] = React.useState("all"); // 'all' | 'instagram' | 'facebook'
 
   // Builder Modal state
   const [builderOpen, setBuilderOpen] = React.useState(false);
@@ -74,12 +75,14 @@ export function AutomationsManager() {
   const [formPublicReplyEnabled, setFormPublicReplyEnabled] = React.useState(true);
   const [formPublicReplyText, setFormPublicReplyText] = React.useState("Thanks for commenting! Check your DM.");
   const [formDmEnabled, setFormDmEnabled] = React.useState(true);
-  const [formDmText, setFormDmText] = React.useState("Hi! Thanks for your comment. Please share your phone number so our team can contact you.");
+  const [formDmText, setFormDmText] = React.useState(
+    "Hi! Thanks for your comment. Please reply with your mobile phone number so our team can send you the full details."
+  );
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState(null);
   const [formSuccess, setFormSuccess] = React.useState(null);
 
-  // 1. Load Connected Instagram Accounts
+  // 1. Load Connected Social Accounts (Instagram + Facebook)
   const fetchAccounts = React.useCallback(async () => {
     setAccountsLoading(true);
     try {
@@ -106,7 +109,7 @@ export function AutomationsManager() {
     return () => clearTimeout(timer);
   }, [fetchAccounts]);
 
-  // 2. Load Instagram Media for Selected Account
+  // 2. Load Media / Posts for Selected Account
   const fetchMedia = React.useCallback(async (accId, forceRefresh = false, cursor = null) => {
     if (!accId) return;
     if (cursor) {
@@ -125,7 +128,7 @@ export function AutomationsManager() {
       const json = await res.json();
 
       if (!res.ok) {
-        throw new Error(json.error || "Failed to load Instagram media.");
+        throw new Error(json.error || "Failed to load posts.");
       }
 
       if (cursor) {
@@ -174,18 +177,28 @@ export function AutomationsManager() {
     return () => clearTimeout(timer);
   }, [fetchAutomations]);
 
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const isFacebookAccount = selectedAccount?.platform === "facebook";
+
   // Open Builder for a Media Item
   const handleOpenBuilderForMedia = (media) => {
     setSelectedMediaForBuilder(media);
     setEditingAutomation(null);
-    setFormName(`Automation for ${media.mediaType.toLowerCase()} post`);
+    const platformLabel = isFacebookAccount ? "Facebook Page post" : "Instagram post";
+    setFormName(`Automation for ${platformLabel}`);
     setFormTriggerType("any");
     setFormKeywords("");
     setFormKeywordMatchType("contains");
     setFormPublicReplyEnabled(true);
-    setFormPublicReplyText("Thanks for commenting! Check your DM.");
+    setFormPublicReplyText(
+      isFacebookAccount
+        ? "Thanks for your comment! I just sent you a private message with details."
+        : "Thanks for commenting! Check your DM."
+    );
     setFormDmEnabled(true);
-    setFormDmText("Hi! Thanks for your comment. Please share your phone number so our team can send you the full details.");
+    setFormDmText(
+      "Hi! Thanks for reaching out. Please reply with your mobile phone number so our team can send you the full details."
+    );
     setFormError(null);
     setFormSuccess(null);
     setBuilderOpen(true);
@@ -200,6 +213,7 @@ export function AutomationsManager() {
       caption: auto.postCaption || "",
       thumbnailUrl: auto.postThumbnailUrl,
       permalink: auto.postPermalink,
+      platform: auto.platform || "instagram",
     });
     setFormName(auto.name);
     setFormTriggerType(auto.triggerType);
@@ -224,6 +238,8 @@ export function AutomationsManager() {
     try {
       const payload = {
         name: formName,
+        platform: selectedAccount?.platform || "instagram",
+        accountId: selectedAccountId,
         instagramAccountId: selectedAccountId,
         postId: selectedMediaForBuilder?.id,
         postCaption: selectedMediaForBuilder?.caption,
@@ -258,7 +274,13 @@ export function AutomationsManager() {
         throw new Error(json.error || "Failed to publish automation.");
       }
 
-      setFormSuccess(editingAutomation ? "Automation updated successfully!" : "Automation published and active!");
+      setFormSuccess(
+        editingAutomation
+          ? "Automation updated successfully!"
+          : "Automation published successfully and is now active!"
+      );
+
+      // Refresh list
       await fetchAutomations();
       setTimeout(() => {
         setBuilderOpen(false);
@@ -271,7 +293,7 @@ export function AutomationsManager() {
     }
   };
 
-  // Toggle Automation Status (Active / Paused)
+  // Toggle Status (Active / Paused)
   const handleToggleStatus = async (auto, e) => {
     if (e) e.stopPropagation();
     const newStatus = auto.status === "active" ? "paused" : "active";
@@ -282,21 +304,26 @@ export function AutomationsManager() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
-        fetchAutomations();
+        setAutomations((prev) =>
+          prev.map((a) => (a.id === auto.id ? { ...a, status: newStatus } : a))
+        );
       }
     } catch (err) {
-      console.error("Failed to toggle status:", err);
+      console.error("Failed to update status:", err);
     }
   };
 
   // Delete Automation
-  const handleDeleteAutomation = async (autoId, autoName, e) => {
+  const handleDeleteAutomation = async (id, name, e) => {
     if (e) e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete "${autoName}"?`)) return;
+    if (!confirm(`Are you sure you want to delete the automation "${name}"?`)) return;
+
     try {
-      const res = await fetch(`/api/automations/${autoId}`, { method: "DELETE" });
+      const res = await fetch(`/api/automations/${id}`, {
+        method: "DELETE",
+      });
       if (res.ok) {
-        fetchAutomations();
+        setAutomations((prev) => prev.filter((a) => a.id !== id));
       }
     } catch (err) {
       console.error("Failed to delete automation:", err);
@@ -322,7 +349,7 @@ export function AutomationsManager() {
     }
   };
 
-  // Filter automations list
+  // Filter automations list by search, status, and platform
   const filteredAutomations = automations.filter((a) => {
     const matchesSearch =
       a.name.toLowerCase().includes(automationSearch.toLowerCase()) ||
@@ -330,12 +357,14 @@ export function AutomationsManager() {
       (a.triggerKeyword && a.triggerKeyword.toLowerCase().includes(automationSearch.toLowerCase()));
 
     if (!matchesSearch) return false;
-    if (statusFilter === "active") return a.status === "active";
-    if (statusFilter === "paused") return a.status === "paused";
+    if (statusFilter === "active" && a.status !== "active") return false;
+    if (statusFilter === "paused" && a.status !== "paused") return false;
+
+    if (platformFilter === "instagram" && (a.platform || "instagram") !== "instagram") return false;
+    if (platformFilter === "facebook" && a.platform !== "facebook") return false;
+
     return true;
   });
-
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   return (
     <div className="space-y-6">
@@ -343,10 +372,10 @@ export function AutomationsManager() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-            Automations & Instagram Media Library
+            Multi-Platform Comment Automations
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Select actual Instagram Reels, videos, and posts from your connected accounts to launch automated comment-to-DM workflows.
+            Select Instagram Reels, posts, or Facebook Page posts to launch automated comment-to-DM lead qualification workflows.
           </p>
         </div>
 
@@ -384,21 +413,25 @@ export function AutomationsManager() {
         <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
-              <Instagram className="size-4 text-primary-accent" />
-              Connected Account:
+              {isFacebookAccount ? (
+                <Facebook className="size-4 text-[#1877F2]" />
+              ) : (
+                <Instagram className="size-4 text-primary-accent" />
+              )}
+              Connected Account / Page:
             </span>
 
             {accountsLoading ? (
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin" />
-                <span>Checking Instagram accounts...</span>
+                <span>Checking connected accounts...</span>
               </div>
             ) : accounts.length === 0 ? (
               <div className="flex items-center gap-2 text-amber-600">
                 <AlertTriangle className="size-4 shrink-0" />
-                <span>No Instagram accounts connected yet.</span>
+                <span>No social accounts connected yet.</span>
                 <Button size="sm" asChild variant="outline" className="h-7 text-xs ml-2">
-                  <Link href="/dashboard/accounts">Connect Instagram</Link>
+                  <Link href="/dashboard/accounts">Connect Account</Link>
                 </Button>
               </div>
             ) : (
@@ -408,11 +441,17 @@ export function AutomationsManager() {
                   onChange={(e) => setSelectedAccountId(e.target.value)}
                   className="rounded-md border border-input bg-card px-3 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[36px]"
                 >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      @{acc.username} ({acc.accountType || "BUSINESS"})
-                    </option>
-                  ))}
+                  {accounts.map((acc) => {
+                    const isFb = acc.platform === "facebook";
+                    const label = isFb
+                      ? `${acc.pageName || acc.name || acc.username} (Facebook Page)`
+                      : `@${acc.username} (Instagram)`;
+                    return (
+                      <option key={acc.id} value={acc.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <Button
@@ -423,7 +462,7 @@ export function AutomationsManager() {
                   className="h-8 text-xs min-h-[36px]"
                 >
                   {mediaLoading ? <Loader2 className="size-3 animate-spin mr-1" /> : <RefreshCw className="size-3 mr-1" />}
-                  Refresh Media
+                  Refresh Posts
                 </Button>
               </div>
             )}
@@ -438,7 +477,7 @@ export function AutomationsManager() {
       </Card>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* TAB 1: REAL INSTAGRAM MEDIA LIBRARY GALLERY               */}
+      {/* TAB 1: MEDIA LIBRARY GALLERY                              */}
       {/* ────────────────────────────────────────────────────────── */}
       {activeTab === "media" && (
         <div className="space-y-4">
@@ -461,13 +500,13 @@ export function AutomationsManager() {
 
           {accounts.length === 0 ? (
             <Card className="border border-dashed border-border bg-card p-12 text-center text-xs text-muted-foreground space-y-3">
-              <Instagram className="size-10 mx-auto text-muted-foreground/40" />
-              <h3 className="text-sm font-semibold text-foreground">Connect Instagram to View Content</h3>
+              <Layers className="size-10 mx-auto text-muted-foreground/40" />
+              <h3 className="text-sm font-semibold text-foreground">Connect an Account to View Content</h3>
               <p className="max-w-md mx-auto text-muted-foreground leading-relaxed">
-                RawReply retrieves actual Reels, videos, and feed posts from your Meta authorized Instagram Professional account. Connect your account to get started.
+                RawReply retrieves actual Reels, videos, and posts from your Meta-authorized Instagram Professional accounts and Facebook Pages.
               </p>
               <Button asChild size="sm" className="mt-2 bg-primary-accent text-white">
-                <Link href="/dashboard/accounts">Connect Instagram Account</Link>
+                <Link href="/dashboard/accounts">Connect Account</Link>
               </Button>
             </Card>
           ) : mediaLoading && mediaItems.length === 0 ? (
@@ -486,9 +525,11 @@ export function AutomationsManager() {
           ) : mediaItems.length === 0 ? (
             <Card className="border border-dashed border-border bg-card p-12 text-center text-xs text-muted-foreground space-y-3">
               <Video className="size-10 mx-auto text-muted-foreground/40" />
-              <h3 className="text-sm font-semibold text-foreground">No Media Found on this Instagram Account</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                No Posts Found on this {isFacebookAccount ? "Facebook Page" : "Instagram Account"}
+              </h3>
               <p className="max-w-md mx-auto text-muted-foreground leading-relaxed">
-                We queried the official Meta Graph API for @{selectedAccount?.username}, but no eligible media items were returned. Publish a Reel or post on Instagram, then click Refresh.
+                We queried the official Meta Graph API for {selectedAccount?.pageName || `@${selectedAccount?.username}`}, but no eligible posts were returned. Publish a post, then click Refresh.
               </p>
               <Button
                 variant="outline"
@@ -497,7 +538,7 @@ export function AutomationsManager() {
                 className="mt-2 text-xs"
               >
                 <RefreshCw className="size-3.5 mr-1.5" />
-                Refresh from Instagram
+                Refresh from Meta
               </Button>
             </Card>
           ) : (
@@ -505,6 +546,8 @@ export function AutomationsManager() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {mediaItems.map((item) => {
                   const isVideo = item.mediaType === "VIDEO" || item.mediaType === "REELS";
+                  const itemPlatform = item.platform || (isFacebookAccount ? "facebook" : "instagram");
+                  const isItemFb = itemPlatform === "facebook";
 
                   return (
                     <Card
@@ -517,33 +560,45 @@ export function AutomationsManager() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={item.thumbnailUrl}
-                            alt={item.caption || "Instagram Media"}
+                            alt={item.caption || "Social Post"}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                            <Video className="size-8 opacity-40 mb-1" />
+                            {isItemFb ? <Facebook className="size-8 opacity-40 mb-1 text-[#1877F2]" /> : <Video className="size-8 opacity-40 mb-1" />}
                             <span className="text-[10px]">Media Asset</span>
                           </div>
                         )}
 
-                        {/* Media Type Badge */}
+                        {/* Media Type & Platform Badges */}
                         <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                          <Badge className="bg-black/75 backdrop-blur-xs text-white border-none text-[9px] font-bold uppercase tracking-wider py-0.5 px-2">
-                            {isVideo ? <Video className="size-3 mr-1 inline" /> : <ImageIcon className="size-3 mr-1 inline" />}
+                          <Badge
+                            className={`border-none text-[9px] font-bold uppercase tracking-wider py-0.5 px-2 ${
+                              isItemFb
+                                ? "bg-[#1877F2] text-white"
+                                : "bg-black/75 backdrop-blur-xs text-white"
+                            }`}
+                          >
+                            {isItemFb ? (
+                              <Facebook className="size-2.5 mr-1 inline" />
+                            ) : isVideo ? (
+                              <Video className="size-3 mr-1 inline" />
+                            ) : (
+                              <ImageIcon className="size-3 mr-1 inline" />
+                            )}
                             {item.mediaType}
                           </Badge>
                         </div>
 
-                        {/* Instagram Link External */}
+                        {/* External Link */}
                         {item.permalink && (
                           <a
                             href={item.permalink}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/90 transition-colors"
-                            title="Open on Instagram"
+                            title={`Open on ${isItemFb ? "Facebook" : "Instagram"}`}
                           >
                             <ExternalLink className="size-3" />
                           </a>
@@ -601,9 +656,9 @@ export function AutomationsManager() {
       {/* ────────────────────────────────────────────────────────── */}
       {activeTab === "automations" && (
         <div className="space-y-4">
-          {/* Search and Filters */}
+          {/* Search, Platform Pills, and Status Filters */}
           <Card className="border border-border bg-card shadow-xs">
-            <CardContent className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <CardContent className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input
@@ -614,34 +669,70 @@ export function AutomationsManager() {
                 />
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("all")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    statusFilter === "all" ? "bg-primary-accent text-white" : "hover:bg-muted text-muted-foreground"
-                  }`}
-                >
-                  All ({automations.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("active")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    statusFilter === "active" ? "bg-emerald-600 text-white" : "hover:bg-muted text-muted-foreground"
-                  }`}
-                >
-                  Active ({automations.filter((a) => a.status === "active").length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("paused")}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    statusFilter === "paused" ? "bg-amber-600 text-white" : "hover:bg-muted text-muted-foreground"
-                  }`}
-                >
-                  Paused ({automations.filter((a) => a.status === "paused").length})
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Platform Filter */}
+                <div className="flex items-center rounded-md border border-border bg-muted/40 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPlatformFilter("all")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      platformFilter === "all" ? "bg-card text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Platforms
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlatformFilter("instagram")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors inline-flex items-center gap-1 ${
+                      platformFilter === "instagram" ? "bg-primary-accent text-white font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Instagram className="size-3" />
+                    Instagram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlatformFilter("facebook")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors inline-flex items-center gap-1 ${
+                      platformFilter === "facebook" ? "bg-[#1877F2] text-white font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Facebook className="size-3" />
+                    Facebook
+                  </button>
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex items-center rounded-md border border-border bg-muted/40 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      statusFilter === "all" ? "bg-card text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("active")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      statusFilter === "active" ? "bg-emerald-600 text-white font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("paused")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      statusFilter === "paused" ? "bg-amber-600 text-white font-semibold" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Paused
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -667,6 +758,7 @@ export function AutomationsManager() {
             <div className="divide-y divide-border border border-border bg-card rounded-lg shadow-xs overflow-hidden">
               {filteredAutomations.map((auto) => {
                 const isActive = auto.status === "active";
+                const isAutoFb = auto.platform === "facebook";
 
                 return (
                   <div
@@ -675,7 +767,7 @@ export function AutomationsManager() {
                   >
                     <div className="flex items-start gap-3.5 flex-1 min-w-0">
                       {/* Post Thumbnail Preview */}
-                      <div className="size-16 rounded-md bg-black/80 overflow-hidden shrink-0 border border-border">
+                      <div className="size-16 rounded-md bg-black/80 overflow-hidden shrink-0 border border-border relative">
                         {auto.postThumbnailUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -685,9 +777,20 @@ export function AutomationsManager() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                            <Video className="size-5 opacity-40" />
+                            {isAutoFb ? (
+                              <Facebook className="size-5 text-[#1877F2] opacity-60" />
+                            ) : (
+                              <Video className="size-5 opacity-40" />
+                            )}
                           </div>
                         )}
+                        <span
+                          className={`absolute bottom-0 right-0 p-1 rounded-tl-md text-white ${
+                            isAutoFb ? "bg-[#1877F2]" : "bg-primary-accent"
+                          }`}
+                        >
+                          {isAutoFb ? <Facebook className="size-2.5" /> : <Instagram className="size-2.5" />}
+                        </span>
                       </div>
 
                       {/* Workflow Details */}
@@ -704,10 +807,19 @@ export function AutomationsManager() {
                           >
                             {auto.status}
                           </Badge>
-                          {auto.instagramUsername && (
-                            <span className="text-[11px] font-semibold text-primary-accent flex items-center gap-1">
-                              <Instagram className="size-3" />
-                              @{auto.instagramUsername}
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] uppercase font-semibold py-0 ${
+                              isAutoFb
+                                ? "border-blue-200 bg-blue-50 text-[#1877F2]"
+                                : "border-pink-200 bg-pink-50 text-pink-700"
+                            }`}
+                          >
+                            {isAutoFb ? "Facebook" : "Instagram"}
+                          </Badge>
+                          {(auto.instagramUsername || auto.accountName) && (
+                            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                              {auto.instagramUsername || auto.accountName}
                             </span>
                           )}
                         </div>
@@ -801,7 +913,7 @@ export function AutomationsManager() {
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 4-8. INTERACTIVE AUTOMATION BUILDER MODAL                  */}
+      {/* INTERACTIVE AUTOMATION BUILDER MODAL                       */}
       {/* ────────────────────────────────────────────────────────── */}
       {builderOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -811,7 +923,19 @@ export function AutomationsManager() {
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
                   <Zap className="size-4 text-primary-accent" />
-                  <span>{editingAutomation ? "Edit Automation Workflow" : "Configure Comment-to-DM Automation"}</span>
+                  <span>
+                    {editingAutomation ? "Edit Automation Workflow" : "Configure Comment-to-DM Automation"}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] uppercase font-bold py-0 ml-1 ${
+                      isFacebookAccount
+                        ? "border-blue-200 bg-blue-50 text-[#1877F2]"
+                        : "border-pink-200 bg-pink-50 text-pink-700"
+                    }`}
+                  >
+                    {isFacebookAccount ? "Facebook Page" : "Instagram"}
+                  </Badge>
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Set trigger rules, public comment replies, and private DM lead qualification questions.
@@ -845,7 +969,7 @@ export function AutomationsManager() {
               {/* 1. Selected Post Overview */}
               <div className="space-y-2">
                 <span className="font-semibold text-xs text-foreground uppercase tracking-wider text-muted-foreground">
-                  1. Selected Instagram Post / Reel
+                  1. Selected {isFacebookAccount ? "Facebook Page Post" : "Instagram Post / Reel"}
                 </span>
                 <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex items-center gap-3.5">
                   <div className="size-16 rounded-md bg-black/80 overflow-hidden shrink-0 border border-border">
@@ -858,14 +982,15 @@ export function AutomationsManager() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <Video className="size-6 opacity-40" />
+                        {isFacebookAccount ? <Facebook className="size-6 text-[#1877F2]" /> : <Video className="size-6 opacity-40" />}
                       </div>
                     )}
                   </div>
                   <div className="space-y-1 flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{selectedMediaForBuilder?.caption || "(No caption)"}</p>
                     <p className="text-[11px] font-mono text-muted-foreground">
-                      Media ID: {selectedMediaForBuilder?.id} • Target Account: @{selectedAccount?.username}
+                      Post ID: {selectedMediaForBuilder?.id} • Target:{" "}
+                      {selectedAccount?.pageName || `@${selectedAccount?.username}`}
                     </p>
                     {selectedMediaForBuilder?.permalink && (
                       <a
@@ -874,7 +999,7 @@ export function AutomationsManager() {
                         rel="noopener noreferrer"
                         className="text-[11px] text-primary-accent hover:underline inline-flex items-center gap-1"
                       >
-                        <span>View post on Instagram</span>
+                        <span>View post on {isFacebookAccount ? "Facebook" : "Instagram"}</span>
                         <ExternalLink className="size-3" />
                       </a>
                     )}
@@ -998,7 +1123,7 @@ export function AutomationsManager() {
                       4. Public Comment Reply
                     </h4>
                     <p className="text-[11px] text-muted-foreground">
-                      This response is posted publicly under the user&apos;s comment on Instagram.
+                      This response is posted publicly under the user&apos;s comment on {isFacebookAccount ? "Facebook" : "Instagram"}.
                     </p>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer font-medium text-xs">
@@ -1027,13 +1152,19 @@ export function AutomationsManager() {
                       <span>{formPublicReplyText.length}/300 characters</span>
                     </div>
 
-                    {/* Instagram Comment Reply Preview Box */}
+                    {/* Comment Reply Preview Box */}
                     <div className="p-3 rounded bg-muted/40 border border-border/80 flex items-start gap-2.5">
-                      <div className="size-6 rounded-full bg-primary-accent text-white flex items-center justify-center text-[10px] font-bold">
-                        {selectedAccount?.username?.[0]?.toUpperCase() || "R"}
+                      <div
+                        className={`size-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${
+                          isFacebookAccount ? "bg-[#1877F2]" : "bg-primary-accent"
+                        }`}
+                      >
+                        {selectedAccount?.pageName?.[0] || selectedAccount?.username?.[0]?.toUpperCase() || "R"}
                       </div>
                       <div className="text-[11px]">
-                        <span className="font-bold text-foreground">@{selectedAccount?.username || "your_brand"}</span>
+                        <span className="font-bold text-foreground">
+                          {isFacebookAccount ? selectedAccount?.pageName : `@${selectedAccount?.username || "your_brand"}`}
+                        </span>
                         <p className="text-foreground mt-0.5">{formPublicReplyText || "..."}</p>
                       </div>
                     </div>
@@ -1041,16 +1172,16 @@ export function AutomationsManager() {
                 )}
               </div>
 
-              {/* 5. Private Instagram DM Section */}
+              {/* 5. Private DM Section (Lead Qualification Prompt) */}
               <div className="space-y-3 p-4 rounded-lg border border-border bg-card">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-xs text-foreground flex items-center gap-2">
                       <Send className="size-4 text-primary-accent" />
-                      5. Private Instagram Direct Message (DM)
+                      5. Private Direct Message (Lead Qualification Prompt)
                     </h4>
                     <p className="text-[11px] text-muted-foreground">
-                      Sent automatically via official Instagram Messaging API to collect verified contact details.
+                      Sent automatically via official {isFacebookAccount ? "Facebook Messenger" : "Instagram DM"} API to collect verified contact details.
                     </p>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer font-medium text-xs">
@@ -1070,22 +1201,30 @@ export function AutomationsManager() {
                       rows={3}
                       value={formDmText}
                       onChange={(e) => setFormDmText(e.target.value)}
-                      placeholder="e.g. Hi! Thanks for reaching out. Please share your WhatsApp/mobile number so we can send the pricing and catalogue."
+                      placeholder="e.g. Hi! Thanks for reaching out. Please reply with your phone number so our team can send you the full details."
                       className="w-full rounded-md border border-input bg-card p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary-accent"
                       maxLength={1000}
                     />
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                      <span>Live Private DM Preview:</span>
+                      <span>Live Private DM Preview (Requires customer mobile number):</span>
                       <span>{formDmText.length}/1000 characters</span>
                     </div>
 
-                    {/* Instagram DM Chat Mockup Preview */}
+                    {/* DM Chat Mockup Preview */}
                     <div className="p-3 rounded-lg bg-muted/30 border border-border space-y-2 max-w-sm">
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground border-b border-border/50 pb-1.5">
-                        <Instagram className="size-3 text-primary-accent" />
-                        <span>Direct Message with @commenter</span>
+                        {isFacebookAccount ? (
+                          <Facebook className="size-3 text-[#1877F2]" />
+                        ) : (
+                          <Instagram className="size-3 text-primary-accent" />
+                        )}
+                        <span>Private Reply to Commenter</span>
                       </div>
-                      <div className="rounded-2xl rounded-tl-xs bg-primary-accent text-white p-3 text-[11px] leading-relaxed shadow-xs">
+                      <div
+                        className={`rounded-2xl rounded-tl-xs p-3 text-[11px] leading-relaxed shadow-xs text-white ${
+                          isFacebookAccount ? "bg-[#1877F2]" : "bg-primary-accent"
+                        }`}
+                      >
                         {formDmText || "..."}
                       </div>
                     </div>
@@ -1100,22 +1239,36 @@ export function AutomationsManager() {
                 </span>
                 <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex flex-wrap items-center justify-between gap-2 text-center text-[11px]">
                   <div className="p-2 bg-card rounded border border-border font-semibold">
-                    @{selectedAccount?.username || "Account"}
+                    {selectedAccount?.pageName || `@${selectedAccount?.username}` || "Account"}
                   </div>
                   <ChevronRight className="size-3.5 text-muted-foreground" />
                   <div className="p-2 bg-card rounded border border-border font-semibold">
-                    Post ID #{selectedMediaForBuilder?.id?.slice(-6) || "Selected"}
+                    Post #{selectedMediaForBuilder?.id?.slice(-6) || "Selected"}
                   </div>
                   <ChevronRight className="size-3.5 text-muted-foreground" />
                   <div className="p-2 bg-card rounded border border-border font-semibold">
                     {formTriggerType === "any" ? "Any Comment" : `Keywords (${formKeywords || "*"})`}
                   </div>
                   <ChevronRight className="size-3.5 text-muted-foreground" />
-                  <div className={`p-2 rounded border font-semibold ${formPublicReplyEnabled ? "bg-emerald-50 text-emerald-800 border-emerald-300" : "bg-muted text-muted-foreground opacity-60"}`}>
+                  <div
+                    className={`p-2 rounded border font-semibold ${
+                      formPublicReplyEnabled
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                        : "bg-muted text-muted-foreground opacity-60"
+                    }`}
+                  >
                     Public Reply
                   </div>
                   <ChevronRight className="size-3.5 text-muted-foreground" />
-                  <div className={`p-2 rounded border font-semibold ${formDmEnabled ? "bg-primary-accent/10 text-primary-accent border-primary-accent/30" : "bg-muted text-muted-foreground opacity-60"}`}>
+                  <div
+                    className={`p-2 rounded border font-semibold ${
+                      formDmEnabled
+                        ? isFacebookAccount
+                          ? "bg-blue-50 text-[#1877F2] border-blue-300"
+                          : "bg-primary-accent/10 text-primary-accent border-primary-accent/30"
+                        : "bg-muted text-muted-foreground opacity-60"
+                    }`}
+                  >
                     Private DM Lead Gate
                   </div>
                 </div>
@@ -1136,7 +1289,7 @@ export function AutomationsManager() {
                   {submitting ? (
                     <>
                       <Loader2 className="size-3.5 animate-spin mr-1.5" />
-                      Publishing to Instagram...
+                      Publishing to {isFacebookAccount ? "Facebook Page" : "Instagram"}...
                     </>
                   ) : (
                     <>
@@ -1162,6 +1315,16 @@ export function AutomationsManager() {
                 <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
                   <History className="size-4 text-primary-accent" />
                   <span>Execution History: {historyAutomation?.name}</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[9px] uppercase font-bold py-0 ${
+                      historyAutomation?.platform === "facebook"
+                        ? "border-blue-200 bg-blue-50 text-[#1877F2]"
+                        : "border-pink-200 bg-pink-50 text-pink-700"
+                    }`}
+                  >
+                    {historyAutomation?.platform === "facebook" ? "Facebook" : "Instagram"}
+                  </Badge>
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Real-time webhook triggers executed by this automation workflow.
@@ -1197,9 +1360,14 @@ export function AutomationsManager() {
                           @{exec.commenter_username || exec.commenter_id || "Commenter"}
                         </span>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={`text-[9px] uppercase font-bold ${
-                            exec.status === "success" ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : "text-destructive"
-                          }`}>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] uppercase font-bold ${
+                              exec.status === "success"
+                                ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20"
+                                : "text-destructive"
+                            }`}
+                          >
                             {exec.status}
                           </Badge>
                           <span className="font-mono text-[10px] text-muted-foreground">

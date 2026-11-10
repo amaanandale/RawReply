@@ -9,6 +9,7 @@ import {
   exchangeCodeForUserToken,
   exchangeForLongLivedToken,
   fetchPagesWithInstagramAccounts,
+  fetchUserFacebookPages,
   subscribePageToWebhooks,
 } from "@/lib/meta/client";
 import { accountStore } from "@/lib/storage/account-store";
@@ -114,7 +115,7 @@ export async function GET(req) {
     return redirectWithClearedCookie(accountsRedirectUrl.toString());
   }
 
-  const { organizationId } = validation;
+  const { organizationId, platform = "instagram" } = validation;
   const redirectUri = getMetaRedirectUri(req);
 
   try {
@@ -124,6 +125,7 @@ export async function GET(req) {
         service: "MetaOAuthCallback",
         action: "exchanging_code_for_token",
         organizationId,
+        platform,
         redirectUri,
         timestamp: new Date().toISOString(),
       })
@@ -142,7 +144,99 @@ export async function GET(req) {
     const expiresInSeconds = longLivedResponse.expires_in || 60 * 24 * 60 * 60;
     const tokenExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-    // 8. Fetch managed Facebook Pages with linked Instagram Business accounts
+    const isPlatform = organizationId === "org_platform_super_admin";
+
+    // ─────────────────────────────────────────────────────────────
+    // BRANCH A: FACEBOOK PAGE CONNECTION FLOW
+    // ─────────────────────────────────────────────────────────────
+    if (platform === "facebook") {
+      const facebookPages = await fetchUserFacebookPages(longLivedUserToken);
+
+      if (!facebookPages || facebookPages.length === 0) {
+        accountsRedirectUrl.searchParams.set("error", "no_facebook_pages");
+        accountsRedirectUrl.searchParams.set(
+          "message",
+          "No Facebook Pages were found for your account. Please ensure you are an Administrator of at least one Facebook Page."
+        );
+        return redirectWithClearedCookie(accountsRedirectUrl.toString());
+      }
+
+      // Enforce 4-account limit for customer workspaces before saving
+      if (!isPlatform) {
+        const existingAccounts = await accountStore.listAccounts(organizationId);
+        const isAlreadyConnected = existingAccounts.some(
+          (a) => a.id === facebookPages[0].pageId || a.pageId === facebookPages[0].pageId
+        );
+        if (!isAlreadyConnected && existingAccounts.length >= 4) {
+          accountsRedirectUrl.searchParams.set("error", "account_limit_reached");
+          accountsRedirectUrl.searchParams.set(
+            "message",
+            "Maximum limit of 4 connected accounts reached. Please disconnect an existing account first."
+          );
+          return redirectWithClearedCookie(accountsRedirectUrl.toString());
+        }
+      }
+
+      const primaryPage = facebookPages[0];
+
+      // Subscribe the Facebook Page's feed & messages webhooks
+      try {
+        await subscribePageToWebhooks({
+          pageId: primaryPage.pageId,
+          pageAccessToken: primaryPage.pageToken,
+        });
+      } catch (webhookErr) {
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            service: "MetaOAuthCallback",
+            action: "facebook_webhook_subscription_warning",
+            pageId: primaryPage.pageId,
+            error: webhookErr.message,
+          })
+        );
+      }
+
+      // Save Facebook Page in AccountStore
+      await accountStore.saveAccount({
+        organizationId,
+        platform: "facebook",
+        instagramBusinessId: primaryPage.pageId,
+        pageId: primaryPage.pageId,
+        pageName: primaryPage.pageName,
+        username: primaryPage.pageName,
+        name: primaryPage.pageName,
+        profilePictureUrl: primaryPage.profilePictureUrl,
+        accountType: "PAGE",
+        accessToken: longLivedUserToken,
+        pageToken: primaryPage.pageToken,
+        tokenExpiresAt,
+      });
+
+      console.log(
+        JSON.stringify({
+          level: "info",
+          service: "MetaOAuthCallback",
+          action: "facebook_page_connected_successfully",
+          organizationId,
+          pageId: primaryPage.pageId,
+          pageName: primaryPage.pageName,
+        })
+      );
+
+      const destinationUrl = isPlatform
+        ? new URL("/admin/integrations", appUrl)
+        : accountsRedirectUrl;
+
+      destinationUrl.searchParams.set("success", "connected");
+      destinationUrl.searchParams.set("platform", "facebook");
+      destinationUrl.searchParams.set("username", primaryPage.pageName);
+      return redirectWithClearedCookie(destinationUrl.toString());
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // BRANCH B: INSTAGRAM PROFESSIONAL ACCOUNT CONNECTION FLOW
+    // ─────────────────────────────────────────────────────────────
     const pagesWithInstagram = await fetchPagesWithInstagramAccounts(longLivedUserToken);
 
     if (pagesWithInstagram.length === 0) {
@@ -154,10 +248,10 @@ export async function GET(req) {
       return redirectWithClearedCookie(accountsRedirectUrl.toString());
     }
 
-    // 9. Connect the primary Instagram Professional account
+    // Connect the primary Instagram Professional account
     const primaryTarget = pagesWithInstagram[0];
 
-    // 10. Subscribe the Facebook Page's feed & messages webhooks
+    // Subscribe the Facebook Page's feed & messages webhooks
     try {
       await subscribePageToWebhooks({
         pageId: primaryTarget.pageId,
@@ -175,8 +269,7 @@ export async function GET(req) {
       );
     }
 
-    // 11. Enforce 4-account limit for customer workspaces before saving
-    const isPlatform = organizationId === "org_platform_super_admin";
+    // Enforce 4-account limit for customer workspaces before saving
     if (!isPlatform) {
       const existingAccounts = await accountStore.listAccounts(organizationId);
       const isAlreadyConnected = existingAccounts.some(
@@ -186,15 +279,16 @@ export async function GET(req) {
         accountsRedirectUrl.searchParams.set("error", "account_limit_reached");
         accountsRedirectUrl.searchParams.set(
           "message",
-          "Maximum limit of 4 connected Instagram accounts reached. Please disconnect an existing account first."
+          "Maximum limit of 4 connected accounts reached. Please disconnect an existing account first."
         );
         return redirectWithClearedCookie(accountsRedirectUrl.toString());
       }
     }
 
-    // 12. Durably save the account in AccountStore with AES-256-GCM encrypted tokens
+    // Durably save the account in AccountStore with AES-256-GCM encrypted tokens
     await accountStore.saveAccount({
       organizationId,
+      platform: "instagram",
       instagramBusinessId: primaryTarget.instagram.id,
       username: primaryTarget.instagram.username,
       name: primaryTarget.instagram.name,
@@ -223,6 +317,7 @@ export async function GET(req) {
       : accountsRedirectUrl;
 
     destinationUrl.searchParams.set("success", "connected");
+    destinationUrl.searchParams.set("platform", "instagram");
     destinationUrl.searchParams.set("username", primaryTarget.instagram.username);
     return redirectWithClearedCookie(destinationUrl.toString());
   } catch (err) {

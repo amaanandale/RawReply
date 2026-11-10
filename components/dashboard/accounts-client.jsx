@@ -12,8 +12,9 @@ import {
   ExternalLink,
   ShieldAlert,
   Calendar,
+  Layers,
 } from "lucide-react";
-import { Instagram } from "@/components/shared/icons";
+import { Instagram, Facebook } from "@/components/shared/icons";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -25,14 +26,35 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const [accounts, setAccounts] = React.useState(initialAccounts || []);
   const [isDisconnecting, setIsDisconnecting] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState(null);
+  const [selectedFilter, setSelectedFilter] = React.useState("all");
 
   const errorParam = searchParams.get("error");
   const successParam = searchParams.get("success");
   const usernameParam = searchParams.get("username");
+  const platformParam = searchParams.get("platform");
   const messageParam = searchParams.get("message");
 
-  async function handleDisconnect(accountId, username) {
-    if (!confirm(`Are you sure you want to disconnect @${username}? Future comment automations for this account will stop.`)) {
+  const totalUsed = accounts.length;
+  const isLimitReached = totalUsed >= 4;
+  const remainingSlots = Math.max(0, 4 - totalUsed);
+
+  const instagramCount = accounts.filter((a) => (a.platform || "instagram") === "instagram").length;
+  const facebookCount = accounts.filter((a) => a.platform === "facebook").length;
+
+  const filteredAccounts = accounts.filter((acc) => {
+    if (selectedFilter === "all") return true;
+    if (selectedFilter === "instagram") return (acc.platform || "instagram") === "instagram";
+    if (selectedFilter === "facebook") return acc.platform === "facebook";
+    return true;
+  });
+
+  async function handleDisconnect(accountId, name, platform) {
+    const platformLabel = platform === "facebook" ? "Facebook Page" : "Instagram Account";
+    if (
+      !confirm(
+        `Are you sure you want to disconnect ${name}? Active automations listening to this ${platformLabel} will stop.`
+      )
+    ) {
       return;
     }
 
@@ -52,7 +74,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
       setAccounts((prev) => prev.filter((a) => a.id !== accountId));
       setActionMessage({
         type: "success",
-        text: `@${username} has been disconnected.`,
+        text: `${name} has been disconnected.`,
       });
       router.refresh();
     } catch (err) {
@@ -76,7 +98,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
               Meta Application Credentials Required
             </p>
             <p className="text-amber-800 leading-relaxed">
-              To connect your real Instagram Business or Creator account, add your Meta Developer credentials to <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px] font-semibold text-amber-950">.env.local</code>:
+              To connect your real Instagram Professional accounts and Facebook Pages, configure your Meta Developer credentials in <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px] font-semibold text-amber-950">.env.local</code>:
             </p>
             <div className="rounded bg-amber-100/70 p-2.5 font-mono text-[11px] text-amber-950 border border-amber-200/60 overflow-x-auto space-y-0.5">
               <div>META_APP_ID=your_facebook_app_id</div>
@@ -114,10 +136,10 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
           <div>
             <p className="font-semibold text-emerald-900">
-              Instagram Account Connected!
+              {platformParam === "facebook" ? "Facebook Page" : "Instagram Account"} Connected!
             </p>
             <p className="mt-0.5 text-emerald-700">
-              {usernameParam ? `@${usernameParam}` : "Your account"} has been successfully linked and webhooks subscribed.
+              {usernameParam ? (platformParam === "facebook" ? usernameParam : `@${usernameParam}`) : "Your account"} has been successfully linked and webhooks subscribed.
             </p>
           </div>
         </div>
@@ -129,7 +151,9 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
             <AlertCircle className="size-4 shrink-0 text-red-600 mt-0.5" />
             <div>
               <p className="font-semibold text-red-900">
-                {errorParam === "missing_configuration"
+                {errorParam === "limit_reached"
+                  ? "Account Limit Reached"
+                  : errorParam === "missing_configuration"
                   ? "Configuration Missing"
                   : errorParam === "forbidden"
                   ? "Access Denied"
@@ -140,108 +164,190 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
               </p>
             </div>
           </div>
-          <Button size="xs" variant="outline" asChild className="shrink-0 bg-white hover:bg-red-50">
-            <a href="/api/auth/meta/authorize">Connect Now</a>
-          </Button>
         </div>
       )}
 
-      {/* Connected Accounts Section */}
-      {accounts.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
+      {/* Account Limit Capacity Bar & Platform Actions */}
+      <Card className="border-border bg-card shadow-xs">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-foreground">
-                  Connected Accounts ({accounts.length})
-                </h2>
-                <Badge variant={accounts.length >= 4 ? "destructive" : "outline"} className="text-[11px] font-mono">
-                  {accounts.length} of 4 slots used ({Math.max(0, 4 - accounts.length)} remaining)
+                <span className="text-sm font-bold text-foreground">Workspace Social Account Slots</span>
+                <Badge
+                  variant={isLimitReached ? "destructive" : "outline"}
+                  className="text-xs font-mono font-semibold"
+                >
+                  {totalUsed} of 4 slots used ({remainingSlots} remaining)
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Maximum 4 connected accounts permitted per workspace.
+              <p className="text-xs text-muted-foreground">
+                Max 4 connected accounts across Instagram Professional and Facebook Pages combined ({instagramCount} Instagram, {facebookCount} Facebook).
               </p>
             </div>
 
-            {accounts.length >= 4 ? (
-              <Button size="sm" disabled className="h-9 px-3 opacity-60 cursor-not-allowed" title="Maximum of 4 connected accounts reached">
-                <Plus className="size-4 mr-1.5" />
-                Limit Reached (4/4)
-              </Button>
-            ) : (
-              <Button size="sm" asChild className="h-9 px-3">
-                <a href="/api/auth/meta/authorize">
-                  <Plus className="size-4 mr-1.5" />
-                  Connect Another Account
-                </a>
-              </Button>
-            )}
-          </div>
-
-          {accounts.length >= 4 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-center gap-2">
-              <AlertCircle className="size-4 text-amber-600 shrink-0" />
-              <span>
-                <strong>Account Limit Reached:</strong> You have reached the maximum allowed limit of 4 connected Instagram accounts. To connect a new account, disconnect an existing one below.
-              </span>
+            {/* Two Distinct Connection Options */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {isLimitReached ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 font-medium">
+                  Slot Limit Reached (4/4) — Disconnect an account to add another
+                </div>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    asChild
+                    variant="outline"
+                    className="min-h-[40px] sm:min-h-[36px] border-primary-accent/40 hover:bg-primary-accent/5 hover:border-primary-accent text-foreground"
+                  >
+                    <a href="/api/auth/meta/authorize?platform=instagram">
+                      <Instagram className="size-4 mr-2 text-primary-accent" />
+                      Connect Instagram
+                    </a>
+                  </Button>
+                  <Button
+                    size="sm"
+                    asChild
+                    className="min-h-[40px] sm:min-h-[36px] bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                  >
+                    <a href="/api/auth/meta/authorize?platform=facebook">
+                      <Facebook className="size-4 mr-2 text-white" />
+                      Connect Facebook Page
+                    </a>
+                  </Button>
+                </>
+              )}
             </div>
-          )}
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* Mobile-First Stacked Account Cards */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {accounts.map((acc) => (
-              <Card key={acc.id} className="border-border bg-card shadow-xs">
+      {/* Account List Header & Platform Filter Tabs */}
+      {accounts.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSelectedFilter("all")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                selectedFilter === "all"
+                  ? "bg-foreground text-background font-semibold"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All ({accounts.length})
+            </button>
+            <button
+              onClick={() => setSelectedFilter("instagram")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                selectedFilter === "instagram"
+                  ? "bg-primary-accent text-white font-semibold"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Instagram className="size-3" />
+              Instagram ({instagramCount})
+            </button>
+            <button
+              onClick={() => setSelectedFilter("facebook")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                selectedFilter === "facebook"
+                  ? "bg-[#1877F2] text-white font-semibold"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Facebook className="size-3" />
+              Facebook Pages ({facebookCount})
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Showing {filteredAccounts.length} of {accounts.length} connected accounts
+          </p>
+        </div>
+      )}
+
+      {/* Connected Accounts Cards */}
+      {filteredAccounts.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filteredAccounts.map((acc) => {
+            const isFb = acc.platform === "facebook";
+            const displayName = isFb
+              ? acc.pageName || acc.name || acc.username
+              : `@${acc.username}`;
+            const secondaryDetail = isFb
+              ? `Page ID: ${acc.pageId || acc.id}`
+              : `IG ID: ${acc.instagramBusinessId || acc.id}`;
+
+            return (
+              <Card key={acc.id} className="border-border bg-card shadow-xs flex flex-col justify-between">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {acc.profilePictureUrl ? (
                         <Image
                           src={acc.profilePictureUrl}
-                          alt={acc.username}
+                          alt={displayName}
                           width={44}
                           height={44}
                           className="size-11 rounded-full border border-border object-cover"
                           unoptimized
                         />
                       ) : (
-                        <div className="flex size-11 items-center justify-center rounded-full bg-primary-accent-light text-primary-accent border border-primary-accent/20">
-                          <Instagram className="size-6" />
+                        <div
+                          className={`flex size-11 items-center justify-center rounded-full border ${
+                            isFb
+                              ? "bg-blue-50 text-[#1877F2] border-blue-200"
+                              : "bg-primary-accent-light text-primary-accent border-primary-accent/20"
+                          }`}
+                        >
+                          {isFb ? <Facebook className="size-6" /> : <Instagram className="size-6" />}
                         </div>
                       )}
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h3 className="font-bold text-sm text-foreground">
-                            @{acc.username}
+                            {displayName}
                           </h3>
-                          <Badge variant="outline" className="text-[10px] uppercase font-semibold">
-                            {acc.accountType}
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] uppercase font-semibold ${
+                              isFb
+                                ? "border-blue-200 bg-blue-50/60 text-[#1877F2]"
+                                : "border-pink-200 bg-pink-50/60 text-pink-700"
+                            }`}
+                          >
+                            {isFb ? "Facebook Page" : "Instagram"}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {acc.name || "Instagram Business"}
+                          {acc.name || (isFb ? "Facebook Business Page" : "Instagram Professional")}
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={acc.status} label="Active" />
+                    <StatusBadge status={acc.status || "connected"} label="Active" />
                   </div>
                 </CardHeader>
 
                 <CardContent className="space-y-2 text-xs border-t border-border pt-3">
                   <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Facebook Page</span>
-                    <span className="font-medium text-foreground">{acc.pageName || acc.pageId}</span>
+                    <span>Platform ID</span>
+                    <span className="font-mono text-[11px] text-foreground">{secondaryDetail}</span>
                   </div>
+                  {!isFb && acc.pageName && (
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Linked Facebook Page</span>
+                      <span className="font-medium text-foreground">{acc.pageName}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-muted-foreground">
                     <span>Webhook Status</span>
                     <span className="font-medium text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="size-3" /> Subscribed
+                      <CheckCircle2 className="size-3" /> Subscribed & Active
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-muted-foreground">
                     <span>Connected On</span>
                     <span className="font-mono text-[11px] text-foreground">
-                      {new Date(acc.connectedAt).toLocaleDateString()}
+                      {acc.connectedAt ? new Date(acc.connectedAt).toLocaleDateString() : "Active"}
                     </span>
                   </div>
                 </CardContent>
@@ -253,14 +359,20 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                     asChild
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <a href="/api/auth/meta/authorize">
+                    <a
+                      href={
+                        isFb
+                          ? "/api/auth/meta/authorize?platform=facebook"
+                          : "/api/auth/meta/authorize?platform=instagram"
+                      }
+                    >
                       <RefreshCw className="size-3 mr-1" /> Reconnect
                     </a>
                   </Button>
                   <Button
                     variant="destructive"
                     size="xs"
-                    onClick={() => handleDisconnect(acc.id, acc.username)}
+                    onClick={() => handleDisconnect(acc.id, displayName, acc.platform)}
                     disabled={isDisconnecting === acc.id}
                     className="text-xs"
                   >
@@ -269,29 +381,54 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                   </Button>
                 </CardFooter>
               </Card>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+      ) : accounts.length > 0 ? (
+        /* Filter returned empty */
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+          No {selectedFilter === "instagram" ? "Instagram accounts" : "Facebook Pages"} found matching this filter.
         </div>
       ) : (
-        /* Empty State */
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/60 p-8 sm:p-12 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-muted/60 mb-4 text-primary-accent border border-border">
-            <Instagram className="size-7" />
-          </div>
-          <h3 className="text-base font-bold text-foreground">
-            No Instagram Accounts Connected
-          </h3>
-          <p className="mt-1.5 max-w-sm text-xs text-muted-foreground leading-relaxed">
-            Link your Instagram Professional account to activate post comment listening, interactive questionnaire DMs, and qualified lead capture.
-          </p>
-          <div className="mt-6">
-            <Button size="lg" asChild className="h-11 px-6 font-semibold min-h-[44px]">
-              <a href="/api/auth/meta/authorize">
-                <Plus className="size-4 mr-2" />
-                Connect Instagram Professional Account
-              </a>
-            </Button>
-          </div>
+        /* Zero Accounts Empty State */
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Option A: Instagram Card */}
+          <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-pink-50 text-pink-600 border border-pink-200 mb-3">
+              <Instagram className="size-7" />
+            </div>
+            <h3 className="text-sm font-bold text-foreground">Connect Instagram Professional</h3>
+            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
+              Link your Instagram Business or Creator account to listen to post and Reel comments, send automated replies, and capture qualified leads.
+            </p>
+            <div className="mt-5 w-full">
+              <Button size="sm" asChild className="w-full font-semibold">
+                <a href="/api/auth/meta/authorize?platform=instagram">
+                  <Plus className="size-4 mr-1.5" />
+                  Connect Instagram Account
+                </a>
+              </Button>
+            </div>
+          </Card>
+
+          {/* Option B: Facebook Card */}
+          <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-blue-50 text-[#1877F2] border border-blue-200 mb-3">
+              <Facebook className="size-7" />
+            </div>
+            <h3 className="text-sm font-bold text-foreground">Connect Facebook Page</h3>
+            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
+              Connect your official Facebook Business Page to automatically reply to feed comments, initiate private Messenger replies, and qualify leads.
+            </p>
+            <div className="mt-5 w-full">
+              <Button size="sm" asChild className="w-full font-semibold bg-[#1877F2] hover:bg-[#166FE5] text-white">
+                <a href="/api/auth/meta/authorize?platform=facebook">
+                  <Plus className="size-4 mr-1.5" />
+                  Connect Facebook Page
+                </a>
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
     </div>

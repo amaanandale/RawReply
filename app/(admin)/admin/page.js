@@ -17,7 +17,7 @@ import {
   Calendar,
   Layers,
 } from "lucide-react";
-import { Instagram, Google } from "@/components/shared/icons";
+import { Instagram, Google, Facebook } from "@/components/shared/icons";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -206,45 +206,45 @@ export default function AdminOverviewPage() {
           </Card>
         </Link>
 
-        {/* 5. Customers with Connected Instagram */}
-        <Link href="/admin/customers?filter=instagram" className="block group">
+        {/* 5. Connected Instagram Accounts */}
+        <Link href="/admin/integrations" className="block group">
           <Card className="h-full border border-border bg-card shadow-xs transition-all hover:border-primary-accent/50 hover:shadow-sm">
             <CardHeader className="p-4 pb-2">
               <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
-                <span>Customers with Connected IG</span>
+                <span>Connected Instagram</span>
                 <Instagram className="size-4 text-muted-foreground group-hover:text-primary-accent transition-colors" />
               </CardDescription>
               <CardTitle className="text-2xl font-bold text-foreground">
-                {loading ? <Loader2 className="size-5 animate-spin inline" /> : (metrics?.customersWithConnectedInstagram ?? 0)}
+                {loading ? <Loader2 className="size-5 animate-spin inline" /> : (metrics?.connectedInstagramAccounts ?? metrics?.customersWithConnectedInstagram ?? 0)}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-[11px] text-muted-foreground flex items-center justify-between">
-                <span>Workspaces with connected accounts</span>
+                <span>Active Instagram Business/Creators</span>
                 <span className="text-primary-accent opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-[10px] font-medium">
-                  Filter <ArrowRight className="size-3 ml-0.5" />
+                  Integrations <ArrowRight className="size-3 ml-0.5" />
                 </span>
               </p>
             </CardContent>
           </Card>
         </Link>
 
-        {/* 6. Total Connected Instagram Accounts */}
+        {/* 6. Connected Facebook Pages */}
         <Link href="/admin/integrations" className="block group">
-          <Card className="h-full border border-border bg-card shadow-xs transition-all hover:border-primary-accent/50 hover:shadow-sm">
+          <Card className="h-full border border-border bg-card shadow-xs transition-all hover:border-blue-500/50 hover:shadow-sm">
             <CardHeader className="p-4 pb-2">
               <CardDescription className="text-xs font-medium text-muted-foreground flex items-center justify-between">
-                <span>Total Connected IG Accounts</span>
-                <Instagram className="size-4 text-primary-accent" />
+                <span>Connected Facebook Pages</span>
+                <Facebook className="size-4 text-[#1877F2] transition-colors" />
               </CardDescription>
-              <CardTitle className="text-2xl font-bold text-foreground">
-                {loading ? <Loader2 className="size-5 animate-spin inline" /> : (metrics?.connectedAccounts ?? 0)}
+              <CardTitle className="text-2xl font-bold text-[#1877F2]">
+                {loading ? <Loader2 className="size-5 animate-spin inline" /> : (metrics?.connectedFacebookPages ?? 0)}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <p className="text-[11px] text-muted-foreground flex items-center justify-between">
-                <span>Across all customer workspaces (max 4/ws)</span>
-                <span className="text-primary-accent opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-[10px] font-medium">
+                <span>Authorized Facebook Business Pages</span>
+                <span className="text-[#1877F2] opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-[10px] font-medium">
                   Integrations <ArrowRight className="size-3 ml-0.5" />
                 </span>
               </p>
@@ -376,16 +376,16 @@ export default function AdminOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Instagram Account Connections */}
+        {/* Recent Social Account Connections */}
         <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Instagram className="size-4 text-primary-accent" />
-                Recent Instagram Account Connections
+                Recent Social Account Connections
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground">
-                Latest Meta OAuth account integrations registered.
+                Latest Instagram & Facebook OAuth integrations registered.
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild className="text-xs h-8">
@@ -403,36 +403,47 @@ export default function AdminOverviewPage() {
               </div>
             ) : !metrics?.recentConnections || metrics.recentConnections.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground">
-                No recent Instagram connections recorded.
+                No recent account connections recorded.
               </div>
             ) : (
               <div className="divide-y divide-border/60">
-                {metrics.recentConnections.slice(0, 5).map((acc) => (
-                  <div key={acc.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <div className="size-7 rounded-full bg-primary-accent/10 flex items-center justify-center shrink-0">
-                        <Instagram className="size-3.5 text-primary-accent" />
+                {metrics.recentConnections.slice(0, 5).map((acc) => {
+                  const isFb = acc.platform === "facebook";
+                  return (
+                    <div key={acc.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <div
+                          className={`size-7 rounded-full flex items-center justify-center shrink-0 ${
+                            isFb ? "bg-blue-50 text-[#1877F2]" : "bg-primary-accent/10 text-primary-accent"
+                          }`}
+                        >
+                          {isFb ? <Facebook className="size-3.5" /> : <Instagram className="size-3.5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">
+                            {isFb ? acc.username : `@${acc.username}`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            Workspace: {acc.organization_id || "Customer"} • {isFb ? "Facebook Page" : "Instagram"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">@{acc.username}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">Workspace: {acc.organization_id || "Customer"}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] uppercase font-semibold ${
+                            acc.status === "connected" ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : ""
+                          }`}
+                        >
+                          {acc.status || "connected"}
+                        </Badge>
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {acc.connected_at ? new Date(acc.connected_at).toLocaleDateString() : "Active"}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] uppercase font-semibold ${
-                          acc.status === "connected" ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" : ""
-                        }`}
-                      >
-                        {acc.status || "connected"}
-                      </Badge>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {acc.connected_at ? new Date(acc.connected_at).toLocaleDateString() : "Active"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

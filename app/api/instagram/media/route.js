@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { accountStore } from "@/lib/storage/account-store";
 import { db } from "@/lib/db/client";
-import { fetchInstagramMedia, MetaGraphError } from "@/lib/meta/client";
+import { fetchInstagramMedia, fetchFacebookPagePosts, MetaGraphError } from "@/lib/meta/client";
 
 export async function GET(req) {
   const session = await getCurrentSession(req);
@@ -78,20 +78,28 @@ export async function GET(req) {
     const tokens = await accountStore.getDecryptedTokens(effectiveOrgId, account.id);
     if (!tokens || (!tokens.pageToken && !tokens.accessToken)) {
       return NextResponse.json(
-        { error: "Instagram access tokens are missing or invalid. Please reconnect the account." },
+        { error: `${account.platform === "facebook" ? "Facebook Page" : "Instagram"} access tokens are missing or invalid. Please reconnect the account.` },
         { status: 400 }
       );
     }
 
     const effectiveToken = tokens.pageToken || tokens.accessToken;
+    const isFacebook = account.platform === "facebook";
 
-    // 4. Fetch actual media from Meta Graph API
-    const result = await fetchInstagramMedia({
-      instagramAccountId: targetInstagramBusinessId,
-      accessToken: effectiveToken,
-      after: afterCursor,
-      limit,
-    });
+    // 4. Fetch actual media from Meta Graph API (Instagram media or Facebook Page posts)
+    const result = isFacebook
+      ? await fetchFacebookPagePosts({
+          pageId: account.pageId || account.id,
+          pageAccessToken: effectiveToken,
+          after: afterCursor,
+          limit,
+        })
+      : await fetchInstagramMedia({
+          instagramAccountId: targetInstagramBusinessId,
+          accessToken: effectiveToken,
+          after: afterCursor,
+          limit,
+        });
 
     // 5. Cache media records in database
     if (result.data && result.data.length > 0) {
@@ -105,6 +113,7 @@ export async function GET(req) {
       paging: result.paging,
       account: {
         id: account.id,
+        platform: account.platform || "instagram",
         username: account.username,
         name: account.name,
         profilePictureUrl: account.profilePictureUrl,

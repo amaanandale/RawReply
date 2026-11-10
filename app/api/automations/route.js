@@ -14,25 +14,36 @@ export async function GET(req) {
     return NextResponse.json({ error: "No active workspace found." }, { status: 400 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const platformParam = searchParams.get("platform");
+
   try {
     const [automations, accounts] = await Promise.all([
-      db.listAutomations(organizationId),
+      db.listAutomations(organizationId, { platform: platformParam || "" }),
       accountStore.listAccounts(organizationId),
     ]);
 
-    const enriched = automations.map((a) => {
+    let enriched = automations.map((a) => {
       const acc = accounts.find(
         (accItem) =>
+          accItem.id === a.account_id ||
           accItem.id === a.instagram_account_id ||
-          accItem.instagramBusinessId === a.instagram_account_id
+          accItem.instagramBusinessId === a.instagram_account_id ||
+          accItem.pageId === a.instagram_account_id ||
+          accItem.facebookPageId === a.instagram_account_id
       );
+
+      const effectivePlatform = a.platform || acc?.platform || "instagram";
 
       return {
         id: a.id,
         name: a.name,
+        platform: effectivePlatform,
         organizationId: a.organization_id,
-        instagramAccountId: a.instagram_account_id,
-        instagramUsername: acc?.username || null,
+        accountId: a.account_id || a.instagram_account_id,
+        instagramAccountId: a.instagram_account_id || a.account_id,
+        instagramUsername: acc?.username || acc?.pageName || acc?.name || null,
+        accountName: acc?.name || acc?.pageName || acc?.username || null,
         accountProfilePicture: acc?.profilePictureUrl || null,
         postId: a.post_id,
         postCaption: a.post_caption,
@@ -53,6 +64,10 @@ export async function GET(req) {
         updatedAt: a.updated_at,
       };
     });
+
+    if (platformParam && platformParam !== "all") {
+      enriched = enriched.filter((a) => a.platform === platformParam || a.platform === "all");
+    }
 
     return NextResponse.json({
       success: true,
@@ -80,6 +95,8 @@ export async function POST(req) {
     const body = await req.json();
     const {
       name,
+      platform = "instagram",
+      accountId,
       instagramAccountId,
       postId,
       postCaption = null,
@@ -94,17 +111,19 @@ export async function POST(req) {
       dmMessageText = null,
     } = body;
 
+    const targetAccountId = accountId || instagramAccountId;
+
     // 1. Validation
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Automation name is required." }, { status: 400 });
     }
 
-    if (!instagramAccountId) {
-      return NextResponse.json({ error: "Please select an Instagram account." }, { status: 400 });
+    if (!targetAccountId) {
+      return NextResponse.json({ error: "Please select a connected Instagram account or Facebook Page." }, { status: 400 });
     }
 
     if (!postId) {
-      return NextResponse.json({ error: "Please select an Instagram post or video." }, { status: 400 });
+      return NextResponse.json({ error: "Please select a post or video." }, { status: 400 });
     }
 
     // Must enable at least one action (public reply or DM)
@@ -137,18 +156,24 @@ export async function POST(req) {
       );
     }
 
-    // 2. Validate that the chosen Instagram account belongs to user's workspace
+    // 2. Validate that the chosen account belongs to user's workspace
     const accounts = await accountStore.listAccounts(organizationId);
     const account = accounts.find(
-      (a) => a.id === instagramAccountId || a.instagramBusinessId === instagramAccountId
+      (a) =>
+        a.id === targetAccountId ||
+        a.instagramBusinessId === targetAccountId ||
+        a.pageId === targetAccountId ||
+        a.facebookPageId === targetAccountId
     );
 
     if (!account) {
       return NextResponse.json(
-        { error: "Selected Instagram account is not connected to this workspace." },
+        { error: "Selected account is not connected to this workspace." },
         { status: 404 }
       );
     }
+
+    const effectivePlatform = platform || account.platform || "instagram";
 
     // 3. Format keywords
     const formattedKeywords = Array.isArray(triggerKeywords)
@@ -159,6 +184,8 @@ export async function POST(req) {
     const automation = await db.createAutomation({
       userId: session.user.id,
       organizationId,
+      platform: effectivePlatform,
+      accountId: account.id,
       instagramAccountId: account.id,
       name: name.trim(),
       triggerType: triggerType === "keyword" ? "keyword" : "any",

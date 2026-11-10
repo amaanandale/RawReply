@@ -56,11 +56,11 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { instagramAccountId } = body;
+    const instagramAccountId = body.instagramAccountId || body.accountId;
 
     if (!instagramAccountId) {
       return NextResponse.json(
-        { error: "instagramAccountId is required" },
+        { error: "Account ID is required" },
         { status: 400 }
       );
     }

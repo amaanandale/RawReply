@@ -25,6 +25,7 @@ import {
   AlertCircle,
   FileDown,
 } from "lucide-react";
+import { Instagram, Facebook } from "@/components/shared/icons";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ export function LeadsClient({ initialData, initialStats }) {
   // Filter & Search states
   const [search, setSearch] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const [selectedPlatform, setSelectedPlatform] = React.useState("all");
   const [sortOrder, setSortOrder] = React.useState("newest");
   const [selectedLeads, setSelectedLeads] = React.useState(new Set());
   const [isLoading, setIsLoading] = React.useState(false);
@@ -86,6 +88,7 @@ export function LeadsClient({ initialData, initialStats }) {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (selectedStatus !== "all") params.set("status", selectedStatus);
+      if (selectedPlatform !== "all") params.set("platform", selectedPlatform);
       params.set("sort", sortOrder);
       params.set("limit", "100");
 
@@ -100,7 +103,7 @@ export function LeadsClient({ initialData, initialStats }) {
     } finally {
       setIsLoading(false);
     }
-  }, [search, selectedStatus, sortOrder]);
+  }, [search, selectedStatus, selectedPlatform, sortOrder]);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -394,6 +397,16 @@ export function LeadsClient({ initialData, initialStats }) {
             {/* Filter & Sort Controls */}
             <div className="flex flex-wrap items-center gap-2">
               <select
+                value={selectedPlatform}
+                onChange={(e) => setSelectedPlatform(e.target.value)}
+                className="h-9 min-h-[44px] sm:min-h-[36px] rounded-md border border-input bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="all">All Platforms</option>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+              </select>
+
+              <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="h-9 min-h-[44px] sm:min-h-[36px] rounded-md border border-input bg-background px-3 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -492,9 +505,21 @@ export function LeadsClient({ initialData, initialStats }) {
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline" className={`text-[10px] uppercase font-bold ${statusCfg.color}`}>
-                      {statusCfg.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase font-bold py-0 ${
+                          lead.platform === "facebook"
+                            ? "border-blue-200 bg-blue-50 text-[#1877F2]"
+                            : "border-pink-200 bg-pink-50 text-pink-700"
+                        }`}
+                      >
+                        {lead.platform === "facebook" ? "Facebook" : "Instagram"}
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] uppercase font-bold ${statusCfg.color}`}>
+                        {statusCfg.label}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Phone Number with tap-to-copy */}
@@ -545,8 +570,9 @@ export function LeadsClient({ initialData, initialStats }) {
                         className="size-4 rounded border-border text-primary-accent focus:ring-primary-accent"
                       />
                     </TableHead>
+                    <TableHead>Platform</TableHead>
                     <TableHead>Phone Number</TableHead>
-                    <TableHead>Instagram User</TableHead>
+                    <TableHead>User / Customer</TableHead>
                     <TableHead>Source Automation</TableHead>
                     <TableHead>Source Post</TableHead>
                     <TableHead>Submitted At</TableHead>
@@ -575,6 +601,26 @@ export function LeadsClient({ initialData, initialStats }) {
                             onChange={() => handleToggleSelect(lead.id)}
                             className="size-4 rounded border-border text-primary-accent focus:ring-primary-accent"
                           />
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] uppercase font-bold inline-flex items-center gap-1 py-0.5 ${
+                              lead.platform === "facebook"
+                                ? "border-blue-200 bg-blue-50 text-[#1877F2]"
+                                : "border-pink-200 bg-pink-50 text-pink-700"
+                            }`}
+                          >
+                            {lead.platform === "facebook" ? (
+                              <>
+                                <Facebook className="size-2.5" /> Facebook
+                              </>
+                            ) : (
+                              <>
+                                <Instagram className="size-2.5" /> Instagram
+                              </>
+                            )}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5 font-mono font-bold text-xs text-foreground">

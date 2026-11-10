@@ -147,22 +147,24 @@ export async function POST(req) {
 
     // Process event downstream
     try {
-      if (event.type === "instagram_comment") {
+      if (event.type === "instagram_comment" || event.type === "facebook_comment") {
         await processIncomingComment({
           commentId: event.data?.commentId,
           postId: event.data?.postId,
           text: event.data?.text,
           commenterId: event.data?.from?.id,
-          commenterUsername: event.data?.from?.username,
+          commenterUsername: event.data?.from?.username || event.data?.from?.name,
           accountId: event.accountId,
+          platform: event.platform || (event.type.startsWith("facebook") ? "facebook" : "instagram"),
         });
-      } else if (event.type === "instagram_message") {
+      } else if (event.type === "instagram_message" || event.type === "facebook_message") {
         await processIncomingMessage({
           mid: event.data?.mid,
           senderId: event.data?.senderId,
           recipientId: event.data?.recipientId,
           text: event.data?.text,
           accountId: event.accountId,
+          platform: event.platform || (event.type.startsWith("facebook") ? "facebook" : "instagram"),
         });
       }
 
