@@ -32,8 +32,21 @@ export default function AuthLayout({ children }) {
       </main>
 
       {/* Footer */}
-      <footer className="py-6 text-center text-xs text-muted-foreground">
-        © 2026 {APP_NAME}. Instagram comment-to-DM automation.
+      <footer className="py-6 text-center text-xs text-muted-foreground space-y-2">
+        <p>© 2026 {APP_NAME}. Instagram comment-to-DM automation.</p>
+        <div className="flex items-center justify-center gap-4 text-[11px]">
+          <Link href="/privacy-policy" className="hover:text-foreground transition-colors">
+            Privacy Policy
+          </Link>
+          <span>•</span>
+          <Link href="/terms-of-service" className="hover:text-foreground transition-colors">
+            Terms of Service
+          </Link>
+          <span>•</span>
+          <Link href="/data-deletion" className="hover:text-foreground transition-colors">
+            Data Deletion
+          </Link>
+        </div>
       </footer>
     </div>
   );

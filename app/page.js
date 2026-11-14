@@ -594,21 +594,45 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Col 4: Platform & Security */}
+            {/* Col 4: Legal & Policies */}
             <div className="space-y-2 text-xs">
-              <h4 className="font-semibold text-foreground">Security & Compliance</h4>
+              <h4 className="font-semibold text-foreground">Legal & Compliance</h4>
               <ul className="space-y-1.5 text-muted-foreground">
-                <li><span>Meta 24h Messaging Window</span></li>
-                <li><span>E.164 Phone Verification</span></li>
-                <li><span>HMAC-SHA256 Webhook Auth</span></li>
-                <li><span>Idempotent Deduplication</span></li>
+                <li>
+                  <Link href="/privacy-policy" className="hover:text-foreground transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms-of-service" className="hover:text-foreground transition-colors">
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/data-deletion" className="hover:text-foreground transition-colors">
+                    User Data Deletion
+                  </Link>
+                </li>
+                <li><span>Meta 24h Messaging Compliant</span></li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>© 2026 {APP_NAME}. All rights reserved.</span>
-            <span>Independent SaaS application built with Next.js & Meta Graph API.</span>
+            <div className="flex items-center gap-4 text-xs">
+              <Link href="/privacy-policy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+              <span>•</span>
+              <Link href="/terms-of-service" className="hover:text-foreground transition-colors">
+                Terms of Service
+              </Link>
+              <span>•</span>
+              <Link href="/data-deletion" className="hover:text-foreground transition-colors">
+                Data Deletion
+              </Link>
+            </div>
           </div>
         </div>
       </footer>
