@@ -14,7 +14,8 @@ export async function GET(req) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN;
+  const expectedToken =
+    process.env.META_WEBHOOK_VERIFY_TOKEN || "your_random_webhook_verify_token_here";
 
   if (mode === "subscribe" && token && expectedToken && token === expectedToken) {
     console.log(
