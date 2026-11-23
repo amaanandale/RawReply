@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Zap,
   Plus,
@@ -35,11 +36,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
 export function AutomationsManager() {
+  const searchParams = useSearchParams();
+  const selectPostParam = searchParams.get("selectPost");
+  const accountIdParam = searchParams.get("accountId");
+
   const [activeTab, setActiveTab] = React.useState("media"); // 'media' | 'automations'
 
   // Accounts state
   const [accounts, setAccounts] = React.useState([]);
-  const [selectedAccountId, setSelectedAccountId] = React.useState("");
+  const [selectedAccountId, setSelectedAccountId] = React.useState(accountIdParam || "");
   const [accountsLoading, setAccountsLoading] = React.useState(true);
 
   // Media state
@@ -181,7 +186,7 @@ export function AutomationsManager() {
   const isFacebookAccount = selectedAccount?.platform === "facebook";
 
   // Open Builder for a Media Item
-  const handleOpenBuilderForMedia = (media) => {
+  const handleOpenBuilderForMedia = React.useCallback((media) => {
     setSelectedMediaForBuilder(media);
     setEditingAutomation(null);
     const platformLabel = isFacebookAccount ? "Facebook Page post" : "Instagram post";
@@ -202,7 +207,20 @@ export function AutomationsManager() {
     setFormError(null);
     setFormSuccess(null);
     setBuilderOpen(true);
-  };
+  }, [isFacebookAccount]);
+
+  // Auto-open builder if navigated with selectPost query param
+  React.useEffect(() => {
+    if (selectPostParam && mediaItems.length > 0) {
+      const targetMedia = mediaItems.find((m) => m.id === selectPostParam);
+      if (targetMedia && !builderOpen && !editingAutomation) {
+        const timer = setTimeout(() => {
+          handleOpenBuilderForMedia(targetMedia);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectPostParam, mediaItems, builderOpen, editingAutomation, handleOpenBuilderForMedia]);
 
   // Open Builder for Editing an Existing Automation
   const handleOpenEditAutomation = (auto) => {

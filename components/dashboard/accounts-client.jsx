@@ -50,13 +50,6 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
     }
   }, []);
 
-  // Sync guide state if errorParam updates
-  React.useEffect(() => {
-    if (isNoBusinessAccountError) {
-      setShowProfessionalGuide(true);
-    }
-  }, [isNoBusinessAccountError]);
-
   const totalUsed = accounts.length;
   const isLimitReached = totalUsed >= 4;
   const remainingSlots = Math.max(0, 4 - totalUsed);

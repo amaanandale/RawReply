@@ -88,6 +88,7 @@ export async function GET(req) {
 
   const isPlatformScope = req.nextUrl.searchParams.get("scope") === "platform";
   const platform = req.nextUrl.searchParams.get("platform") === "facebook" ? "facebook" : "instagram";
+  const returnTo = req.nextUrl.searchParams.get("returnTo") || (req.nextUrl.searchParams.get("from") === "accounts" ? "/dashboard/accounts" : "/dashboard");
 
   let organizationId = session.organizationId;
   const userId = session.user.id;
@@ -138,6 +139,7 @@ export async function GET(req) {
       userId,
       redirectUri,
       platform,
+      returnTo,
     });
 
   // 4. Safe structured logging (no secrets, authorization codes or tokens)

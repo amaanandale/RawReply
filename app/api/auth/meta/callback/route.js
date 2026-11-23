@@ -358,9 +358,10 @@ export async function GET(req) {
       })
     );
 
+    const returnPath = validation.returnTo || (platform === "facebook" ? "/dashboard/accounts" : "/dashboard");
     const destinationUrl = isPlatform
       ? new URL("/admin/integrations", appUrl)
-      : accountsRedirectUrl;
+      : new URL(returnPath, appUrl);
 
     destinationUrl.searchParams.set("success", "connected");
     destinationUrl.searchParams.set("platform", "instagram");

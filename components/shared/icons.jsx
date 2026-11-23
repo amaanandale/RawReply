@@ -66,6 +66,7 @@ export function GoogleIcon({ className = "size-4", ...props }) {
  */
 export function RawReplyLogo({ className = "size-7", ...props }) {
   return (
+    /* eslint-disable-next-line @next/next/no-img-element */
     <img
       src="/favicon.png"
       alt="RawReply Logo"
