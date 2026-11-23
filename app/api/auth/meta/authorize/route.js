@@ -27,9 +27,9 @@ export async function GET(req) {
 
   const appId = process.env.META_APP_ID || META_DEFAULT_APP_ID;
   const configId =
-    process.env.META_CONFIG_ID !== undefined
+    process.env.META_CONFIG_ID && process.env.META_CONFIG_ID !== "none"
       ? process.env.META_CONFIG_ID
-      : "";
+      : META_DEFAULT_CONFIG_ID;
   const appSecret = process.env.META_APP_SECRET || META_DEFAULT_APP_SECRET;
 
   // 1. Verify Meta environment configuration
