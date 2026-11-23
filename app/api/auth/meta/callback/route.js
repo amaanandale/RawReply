@@ -8,9 +8,11 @@ import {
 import {
   exchangeCodeForUserToken,
   exchangeForLongLivedToken,
+  fetchAllInstagramAccounts,
   fetchPagesWithInstagramAccounts,
   fetchUserFacebookPages,
   subscribePageToWebhooks,
+  subscribeInstagramAccountToWebhooks,
 } from "@/lib/meta/client";
 import { accountStore } from "@/lib/storage/account-store";
 import { logSystemError, ERROR_CATEGORIES, ERROR_SEVERITIES } from "@/lib/monitoring/error-logger";
@@ -236,11 +238,15 @@ export async function GET(req) {
 
     // ─────────────────────────────────────────────────────────────
     // BRANCH B: INSTAGRAM PROFESSIONAL ACCOUNT CONNECTION FLOW
+    // Comprehensively discovers Instagram accounts via:
+    // 1. Meta Instagram API with Unified Login (/me/assigned_instagram_accounts)
+    // 2. Meta Business Portfolios (/me/businesses -> instagram_accounts)
+    // 3. Traditional Facebook Pages (/me/accounts -> instagram_business_account)
     // ─────────────────────────────────────────────────────────────
-    const pagesWithInstagram = await fetchPagesWithInstagramAccounts(longLivedUserToken);
+    const availableInstagramAccounts = await fetchAllInstagramAccounts(longLivedUserToken);
 
-    if (pagesWithInstagram.length === 0) {
-      // Check if the user has any Facebook Pages that don't have Instagram linked yet
+    if (availableInstagramAccounts.length === 0) {
+      // Diagnostic check: check if user has any Facebook Pages without Instagram linked
       let detectedPageName = null;
       try {
         const userPages = await fetchUserFacebookPages(longLivedUserToken);
@@ -256,34 +262,54 @@ export async function GET(req) {
         accountsRedirectUrl.searchParams.set("page_name", detectedPageName);
         accountsRedirectUrl.searchParams.set(
           "message",
-          `We detected your Facebook Page "${detectedPageName}", but no Instagram Professional (Business or Creator) account is linked to it. Please switch your Instagram account to Professional and link it to your Facebook Page, then reconnect.`
+          `We detected your Facebook Page "${detectedPageName}", but no Instagram Professional account was assigned or linked. Please make sure your Instagram account is Professional and selected during Meta login.`
         );
       } else {
         accountsRedirectUrl.searchParams.set(
           "message",
-          "No Instagram Professional (Business or Creator) account or Facebook Page was found. Please switch your Instagram account to Professional and link it to a Facebook Page, then reconnect."
+          "No Instagram Professional (Business or Creator) account was found assigned or connected. Please make sure your Instagram account is Professional and selected during Meta login."
         );
       }
       return redirectWithClearedCookie(accountsRedirectUrl.toString());
     }
 
     // Connect the primary Instagram Professional account
-    const primaryTarget = pagesWithInstagram[0];
+    const primaryTarget = availableInstagramAccounts[0];
 
-    // Subscribe the Facebook Page's feed & messages webhooks
+    // 1. If a Facebook Page is attached, subscribe the page webhooks
+    if (primaryTarget.pageId && primaryTarget.pageToken) {
+      try {
+        await subscribePageToWebhooks({
+          pageId: primaryTarget.pageId,
+          pageAccessToken: primaryTarget.pageToken,
+        });
+      } catch (webhookErr) {
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            service: "MetaOAuthCallback",
+            action: "page_webhook_subscription_warning",
+            pageId: primaryTarget.pageId,
+            error: webhookErr.message,
+          })
+        );
+      }
+    }
+
+    // 2. Subscribe direct Instagram Account webhooks (Unified Login requirement)
     try {
-      await subscribePageToWebhooks({
-        pageId: primaryTarget.pageId,
-        pageAccessToken: primaryTarget.pageToken,
+      await subscribeInstagramAccountToWebhooks({
+        instagramBusinessId: primaryTarget.instagram.id,
+        accessToken: longLivedUserToken,
       });
-    } catch (webhookErr) {
+    } catch (igWebhookErr) {
       console.warn(
         JSON.stringify({
           level: "warn",
           service: "MetaOAuthCallback",
-          action: "webhook_subscription_warning",
-          pageId: primaryTarget.pageId,
-          error: webhookErr.message,
+          action: "ig_webhook_subscription_warning",
+          instagramId: primaryTarget.instagram.id,
+          error: igWebhookErr.message,
         })
       );
     }
@@ -308,15 +334,16 @@ export async function GET(req) {
     await accountStore.saveAccount({
       organizationId,
       platform: "instagram",
+      id: primaryTarget.instagram.id,
       instagramBusinessId: primaryTarget.instagram.id,
       username: primaryTarget.instagram.username,
       name: primaryTarget.instagram.name,
       profilePictureUrl: primaryTarget.instagram.profilePictureUrl,
-      accountType: primaryTarget.instagram.accountType,
-      pageId: primaryTarget.pageId,
-      pageName: primaryTarget.pageName,
+      accountType: primaryTarget.instagram.accountType || "BUSINESS",
+      pageId: primaryTarget.pageId || primaryTarget.instagram.id,
+      pageName: primaryTarget.pageName || primaryTarget.instagram.name || primaryTarget.instagram.username,
       accessToken: longLivedUserToken,
-      pageToken: primaryTarget.pageToken,
+      pageToken: primaryTarget.pageToken || longLivedUserToken,
       tokenExpiresAt,
     });
 
