@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircle, ShieldCheck, Shield } from "lucide-react";
+import { ShieldCheck, Shield } from "lucide-react";
+import { RawReplyLogo } from "@/components/shared/icons";
 import { DASHBOARD_NAV_ITEMS } from "@/config/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -43,9 +44,7 @@ export function DashboardSidebar({ isOpen, onClose }) {
             className="flex items-center gap-2.5 font-semibold text-foreground tracking-tight hover:opacity-90"
             onClick={onClose}
           >
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
-              <MessageCircle className="size-4" />
-            </div>
+            <RawReplyLogo className="size-7 object-contain" />
             <span className="text-sm font-bold tracking-tight">{APP_NAME}</span>
           </Link>
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">

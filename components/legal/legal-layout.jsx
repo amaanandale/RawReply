@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { MessageCircle, ArrowLeft, ArrowRight, ShieldCheck, Scale, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ShieldCheck, Scale, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RawReplyLogo } from "@/components/shared/icons";
 import { APP_NAME } from "@/lib/constants";
 
 export function LegalLayout({
@@ -19,9 +20,7 @@ export function LegalLayout({
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           {/* Brand Logo & Wordmark */}
           <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight text-foreground hover:opacity-90 transition-opacity">
-            <div className="flex size-7 items-center justify-center rounded-md bg-emerald-600 text-white shadow-xs">
-              <MessageCircle className="size-4" />
-            </div>
+            <RawReplyLogo className="size-7 object-contain" />
             <span className="text-base tracking-tight">{APP_NAME}</span>
           </Link>
 
@@ -116,9 +115,7 @@ export function LegalLayout({
             {/* Col 1: Brand */}
             <div className="space-y-3">
               <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-foreground">
-                <div className="flex size-6 items-center justify-center rounded-md bg-emerald-600 text-white">
-                  <MessageCircle className="size-3.5" />
-                </div>
+                <RawReplyLogo className="size-6 object-contain" />
                 <span className="text-sm">{APP_NAME}</span>
               </Link>
               <p className="text-muted-foreground leading-relaxed">

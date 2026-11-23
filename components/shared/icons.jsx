@@ -61,4 +61,21 @@ export function GoogleIcon({ className = "size-4", ...props }) {
   );
 }
 
-export { InstagramIcon as Instagram, FacebookIcon as Facebook, GoogleIcon as Google };
+/**
+ * Official RawReply Logo Icon Badge
+ */
+export function RawReplyLogo({ className = "size-7", ...props }) {
+  return (
+    <img
+      src="/favicon.png"
+      alt="RawReply Logo"
+      width={32}
+      height={32}
+      className={className}
+      {...props}
+    />
+  );
+}
+
+export { InstagramIcon as Instagram, FacebookIcon as Facebook, GoogleIcon as Google, RawReplyLogo as RawReplyIcon };
+

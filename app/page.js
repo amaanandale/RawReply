@@ -15,7 +15,7 @@ import {
   Check,
   Lock,
 } from "lucide-react";
-import { Instagram } from "@/components/shared/icons";
+import { Instagram, RawReplyLogo } from "@/components/shared/icons";
 import { ProductDemoVideo } from "@/components/landing/product-demo-video";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +37,8 @@ export default function HomePage() {
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           {/* Logo & Wordmark */}
-          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight text-foreground">
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
-              <MessageCircle className="size-4" />
-            </div>
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight text-foreground hover:opacity-90 transition-opacity">
+            <RawReplyLogo className="size-7 object-contain" />
             <span className="text-base tracking-tight">{APP_NAME}</span>
           </Link>
 
@@ -562,9 +560,7 @@ export default function HomePage() {
             {/* Col 1: Brand */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <MessageCircle className="size-3.5" />
-                </div>
+                <RawReplyLogo className="size-6 object-contain" />
                 <span className="text-sm font-bold tracking-tight">{APP_NAME}</span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MessageCircle, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { RawReplyLogo } from "@/components/shared/icons";
 import { APP_NAME } from "@/lib/constants";
 
 export default function AuthLayout({ children }) {
@@ -11,9 +12,7 @@ export default function AuthLayout({ children }) {
           href="/"
           className="flex items-center gap-2 font-semibold text-foreground tracking-tight hover:opacity-90 transition-opacity"
         >
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
-            <MessageCircle className="size-4" />
-          </div>
+          <RawReplyLogo className="size-7 object-contain" />
           <span className="text-sm font-bold tracking-tight">{APP_NAME}</span>
         </Link>
 
