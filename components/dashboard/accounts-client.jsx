@@ -13,6 +13,11 @@ import {
   ShieldAlert,
   Calendar,
   Layers,
+  HelpCircle,
+  X,
+  Smartphone,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { Instagram, Facebook } from "@/components/shared/icons";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -33,6 +38,24 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const usernameParam = searchParams.get("username");
   const platformParam = searchParams.get("platform");
   const messageParam = searchParams.get("message");
+  const pageNameParam = searchParams.get("page_name");
+
+  const isNoBusinessAccountError = errorParam === "no_instagram_business_account";
+  const [showProfessionalGuide, setShowProfessionalGuide] = React.useState(isNoBusinessAccountError);
+
+  // Clean Meta's legacy #_=_ fragment from URL if present
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#_=_") {
+      window.history.replaceState(null, "", window.location.href.split("#")[0]);
+    }
+  }, []);
+
+  // Sync guide state if errorParam updates
+  React.useEffect(() => {
+    if (isNoBusinessAccountError) {
+      setShowProfessionalGuide(true);
+    }
+  }, [isNoBusinessAccountError]);
 
   const totalUsed = accounts.length;
   const isLimitReached = totalUsed >= 4;
@@ -145,7 +168,139 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
         </div>
       )}
 
-      {errorParam && (
+      {/* Dedicated Instagram Professional Guidance Card */}
+      {showProfessionalGuide && (
+        <Card className="border-amber-300/80 bg-gradient-to-br from-amber-50/80 via-background to-orange-50/40 dark:from-amber-950/25 dark:via-background dark:to-orange-950/20 shadow-xs overflow-hidden">
+          <CardHeader className="pb-3 border-b border-amber-200/50 dark:border-amber-900/40">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white shadow-xs">
+                  <Instagram className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="border-amber-300 bg-amber-100/70 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-[10px] uppercase font-bold tracking-wider"
+                    >
+                      {isNoBusinessAccountError ? "Action Required" : "Setup Guide"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground font-medium">Meta Graph API v21.0</span>
+                  </div>
+                  <CardTitle className="text-base font-bold text-foreground mt-0.5">
+                    Switch Your Instagram Account to Professional
+                  </CardTitle>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProfessionalGuide(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Dismiss guide"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <CardDescription className="text-xs text-muted-foreground mt-2 leading-relaxed">
+              Meta&apos;s official Graph API requires your Instagram account to be set to <strong className="text-foreground font-semibold">Professional (Creator or Business)</strong> and linked to a Facebook Page to automate comments, send instant direct message replies, and capture qualified leads. Personal accounts are restricted by Meta.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-4 pb-4 space-y-4">
+            {pageNameParam && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-blue-200 bg-blue-50/80 dark:border-blue-900/50 dark:bg-blue-950/30 p-3 text-xs text-blue-900 dark:text-blue-300">
+                <Facebook className="size-4 shrink-0 text-[#1877F2]" />
+                <div>
+                  <span className="font-semibold text-blue-950 dark:text-blue-200">
+                    Facebook Page Detected: &quot;{pageNameParam}&quot;
+                  </span>
+                  <p className="text-[11px] text-blue-800 dark:text-blue-300/80 mt-0.5">
+                    Great news! You already have this Facebook Page. You just need to link your Instagram account to it in the Instagram mobile app.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 3 Numbered Steps */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-border/70 bg-card p-3.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-primary-accent/15 text-primary-accent text-xs font-bold">
+                    1
+                  </span>
+                  <h4 className="text-xs font-semibold text-foreground">Switch on Instagram App</h4>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Open the Instagram app on your phone. Go to your <strong className="text-foreground">Profile</strong> → tap <strong className="text-foreground">Edit profile</strong> (or ☰ Settings) → scroll down and tap <strong className="text-foreground">Switch to professional account</strong> (choose Creator or Business — both are 100% free and keep all your posts).
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border/70 bg-card p-3.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-primary-accent/15 text-primary-accent text-xs font-bold">
+                    2
+                  </span>
+                  <h4 className="text-xs font-semibold text-foreground">Connect Facebook Page</h4>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  In Instagram, tap <strong className="text-foreground">Edit profile</strong> → under <strong className="text-foreground">Public business information</strong>, tap <strong className="text-foreground">Page</strong> → select your Facebook Page {pageNameParam ? `("${pageNameParam}")` : ""} or create a free one instantly.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border/70 bg-card p-3.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-primary-accent/15 text-primary-accent text-xs font-bold">
+                    3
+                  </span>
+                  <h4 className="text-xs font-semibold text-foreground">Reconnect with RawReply</h4>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Once switched and linked, click the reconnect button below. Meta will automatically identify your Professional account and finish the connection!
+                </p>
+              </div>
+            </div>
+          </CardContent>
+
+          <CardFooter className="border-t border-border/70 bg-muted/30 pt-3 pb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                size="sm"
+                asChild
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
+              >
+                <a href="/api/auth/meta/authorize?platform=instagram">
+                  <Instagram className="size-4 mr-1.5" />
+                  I&apos;ve Switched to Professional — Reconnect Instagram
+                </a>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="text-xs"
+              >
+                <a href="/api/auth/meta/authorize?platform=facebook">
+                  <Facebook className="size-3.5 mr-1.5 text-[#1877F2]" />
+                  Connect Facebook Page Instead
+                </a>
+              </Button>
+            </div>
+
+            <a
+              href="https://help.instagram.com/502981923235522"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              <span>Instagram Official Guide</span>
+              <ExternalLink className="size-3 ml-1" />
+            </a>
+          </CardFooter>
+        </Card>
+      )}
+
+      {/* Other OAuth Callback Errors */}
+      {errorParam && !isNoBusinessAccountError && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">
           <div className="flex items-start gap-2.5">
             <AlertCircle className="size-4 shrink-0 text-red-600 mt-0.5" />
@@ -184,6 +339,16 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
               <p className="text-xs text-muted-foreground">
                 Max 4 connected accounts across Instagram Professional and Facebook Pages combined ({instagramCount} Instagram, {facebookCount} Facebook).
               </p>
+              <div className="flex items-center gap-3 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowProfessionalGuide((v) => !v)}
+                  className="inline-flex items-center gap-1.5 text-xs text-primary-accent hover:text-primary-accent/80 transition-colors font-medium underline-offset-4 hover:underline"
+                >
+                  <HelpCircle className="size-3.5" />
+                  <span>{showProfessionalGuide ? "Hide Setup Guide" : "Need help? View Professional Account Guide"}</span>
+                </button>
+              </div>
             </div>
 
             {/* Two Distinct Connection Options */}
@@ -401,13 +566,20 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
             <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
               Link your Instagram Business or Creator account to listen to post and Reel comments, send automated replies, and capture qualified leads.
             </p>
-            <div className="mt-5 w-full">
+            <div className="mt-5 w-full flex flex-col items-center">
               <Button size="sm" asChild className="w-full font-semibold">
                 <a href="/api/auth/meta/authorize?platform=instagram">
                   <Plus className="size-4 mr-1.5" />
                   Connect Instagram Account
                 </a>
               </Button>
+              <button
+                type="button"
+                onClick={() => setShowProfessionalGuide(true)}
+                className="mt-2.5 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+              >
+                Requires a free Professional account (view guide)
+              </button>
             </div>
           </Card>
 

@@ -240,11 +240,30 @@ export async function GET(req) {
     const pagesWithInstagram = await fetchPagesWithInstagramAccounts(longLivedUserToken);
 
     if (pagesWithInstagram.length === 0) {
+      // Check if the user has any Facebook Pages that don't have Instagram linked yet
+      let detectedPageName = null;
+      try {
+        const userPages = await fetchUserFacebookPages(longLivedUserToken);
+        if (userPages && userPages.length > 0) {
+          detectedPageName = userPages[0].pageName;
+        }
+      } catch (pageErr) {
+        // Non-critical diagnostic check
+      }
+
       accountsRedirectUrl.searchParams.set("error", "no_instagram_business_account");
-      accountsRedirectUrl.searchParams.set(
-        "message",
-        "No Instagram Professional (Business or Creator) account was found connected to your Facebook Pages. Please link your Instagram account to a Facebook Page in Meta settings and retry."
-      );
+      if (detectedPageName) {
+        accountsRedirectUrl.searchParams.set("page_name", detectedPageName);
+        accountsRedirectUrl.searchParams.set(
+          "message",
+          `We detected your Facebook Page "${detectedPageName}", but no Instagram Professional (Business or Creator) account is linked to it. Please switch your Instagram account to Professional and link it to your Facebook Page, then reconnect.`
+        );
+      } else {
+        accountsRedirectUrl.searchParams.set(
+          "message",
+          "No Instagram Professional (Business or Creator) account or Facebook Page was found. Please switch your Instagram account to Professional and link it to a Facebook Page, then reconnect."
+        );
+      }
       return redirectWithClearedCookie(accountsRedirectUrl.toString());
     }
 
