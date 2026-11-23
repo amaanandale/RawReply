@@ -17,21 +17,21 @@ export async function GET(req) {
   const expectedToken =
     process.env.META_WEBHOOK_VERIFY_TOKEN || "your_random_webhook_verify_token_here";
 
-  // if (mode === "subscribe" && token && expectedToken && token === expectedToken) {
-  console.log(
-    JSON.stringify({
-      level: "info",
-      service: "MetaWebhook",
-      action: "verification_success",
-      timestamp: new Date().toISOString(),
-    })
-  );
-  // Return challenge strictly as plain text with 200 OK
-  return new Response(challenge, {
-    status: 200,
-    headers: { "Content-Type": "text/plain" },
-  });
-  // }
+  if (mode === "subscribe" && token && expectedToken && token === expectedToken) {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        service: "MetaWebhook",
+        action: "verification_success",
+        timestamp: new Date().toISOString(),
+      })
+    );
+    // Return challenge strictly as plain text with 200 OK
+    return new Response(challenge, {
+      status: 200,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
 
   console.warn(
     JSON.stringify({
