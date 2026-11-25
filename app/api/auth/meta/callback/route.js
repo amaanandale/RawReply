@@ -15,7 +15,9 @@ import {
   fetchUserFacebookPages,
   subscribePageToWebhooks,
   subscribeInstagramAccountToWebhooks,
+  fetchInstagramMedia,
 } from "@/lib/meta/client";
+import { db } from "@/lib/db/client";
 import { accountStore } from "@/lib/storage/account-store";
 import { logSystemError, ERROR_CATEGORIES, ERROR_SEVERITIES } from "@/lib/monitoring/error-logger";
 
@@ -348,6 +350,38 @@ export async function GET(req) {
       pageToken: primaryTarget.pageToken || longLivedUserToken,
       tokenExpiresAt,
     });
+
+    // Immediately fetch and cache recent Instagram media into database
+    try {
+      const effectiveMediaToken = primaryTarget.pageToken || longLivedUserToken;
+      const mediaResult = await fetchInstagramMedia({
+        instagramAccountId: primaryTarget.instagram.id,
+        accessToken: effectiveMediaToken,
+        limit: 24,
+      });
+      if (mediaResult && mediaResult.data && mediaResult.data.length > 0) {
+        await db.saveInstagramMedia(mediaResult.data, organizationId, primaryTarget.instagram.id);
+        console.log(
+          JSON.stringify({
+            level: "info",
+            service: "MetaOAuthCallback",
+            action: "initial_media_sync_completed",
+            organizationId,
+            instagramBusinessId: primaryTarget.instagram.id,
+            count: mediaResult.data.length,
+          })
+        );
+      }
+    } catch (mediaSyncErr) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          service: "MetaOAuthCallback",
+          action: "initial_media_sync_warning",
+          error: mediaSyncErr.message,
+        })
+      );
+    }
 
     console.log(
       JSON.stringify({

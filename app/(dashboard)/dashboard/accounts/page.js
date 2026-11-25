@@ -48,22 +48,14 @@ export default function AccountsPage() {
       {/* Page Header */}
       <PageHeader
         title="Connected Accounts"
-        description="Connect your Instagram Professional accounts and Facebook Pages via the official Meta Graph API v21.0."
+        description="Connect your Instagram Professional accounts via the official Meta Unified Login API v21.0."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" asChild variant="outline" className="min-h-[44px] sm:min-h-[36px] border-primary-accent/30 hover:bg-primary-accent/5">
-              <a href="/api/auth/meta/authorize?platform=instagram">
-                <Instagram className="size-4 mr-1.5 text-primary-accent" />
-                Connect Instagram
-              </a>
-            </Button>
-            <Button size="sm" asChild className="min-h-[44px] sm:min-h-[36px] bg-[#1877F2] hover:bg-[#166FE5] text-white">
-              <a href="/api/auth/meta/authorize?platform=facebook">
-                <Facebook className="size-4 mr-1.5 text-white" />
-                Connect Facebook Page
-              </a>
-            </Button>
-          </div>
+          <Button size="sm" asChild className="min-h-[44px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs">
+            <a href="/api/auth/meta/authorize?platform=instagram">
+              <Instagram className="size-4 mr-1.5" />
+              Connect Instagram Account
+            </a>
+          </Button>
         }
       />
 

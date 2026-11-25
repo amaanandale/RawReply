@@ -344,36 +344,23 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
               </div>
             </div>
 
-            {/* Two Distinct Connection Options */}
+            {/* Single Unified Connection Button */}
             <div className="flex flex-wrap items-center gap-2.5">
               {isLimitReached ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 font-medium">
                   Slot Limit Reached (4/4) — Disconnect an account to add another
                 </div>
               ) : (
-                <>
-                  <Button
-                    size="sm"
-                    asChild
-                    variant="outline"
-                    className="min-h-[40px] sm:min-h-[36px] border-primary-accent/40 hover:bg-primary-accent/5 hover:border-primary-accent text-foreground"
-                  >
-                    <a href="/api/auth/meta/authorize?platform=instagram">
-                      <Instagram className="size-4 mr-2 text-primary-accent" />
-                      Connect Instagram
-                    </a>
-                  </Button>
-                  <Button
-                    size="sm"
-                    asChild
-                    className="min-h-[40px] sm:min-h-[36px] bg-[#1877F2] hover:bg-[#166FE5] text-white"
-                  >
-                    <a href="/api/auth/meta/authorize?platform=facebook">
-                      <Facebook className="size-4 mr-2 text-white" />
-                      Connect Facebook Page
-                    </a>
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  asChild
+                  className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
+                >
+                  <a href="/api/auth/meta/authorize?platform=instagram">
+                    <Instagram className="size-4 mr-2" />
+                    Connect Instagram Account
+                  </a>
+                </Button>
               )}
             </div>
           </div>
@@ -548,53 +535,31 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           No {selectedFilter === "instagram" ? "Instagram accounts" : "Facebook Pages"} found matching this filter.
         </div>
       ) : (
-        /* Zero Accounts Empty State */
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Option A: Instagram Card */}
-          <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-pink-50 text-pink-600 border border-pink-200 mb-3">
-              <Instagram className="size-7" />
-            </div>
-            <h3 className="text-sm font-bold text-foreground">Connect Instagram Professional</h3>
-            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
-              Link your Instagram Business or Creator account to listen to post and Reel comments, send automated replies, and capture qualified leads.
-            </p>
-            <div className="mt-5 w-full flex flex-col items-center">
-              <Button size="sm" asChild className="w-full font-semibold">
-                <a href="/api/auth/meta/authorize?platform=instagram">
-                  <Plus className="size-4 mr-1.5" />
-                  Connect Instagram Account
-                </a>
-              </Button>
-              <button
-                type="button"
-                onClick={() => setShowProfessionalGuide(true)}
-                className="mt-2.5 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
-              >
-                Requires a free Professional account (view guide)
-              </button>
-            </div>
-          </Card>
-
-          {/* Option B: Facebook Card */}
-          <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-blue-50 text-[#1877F2] border border-blue-200 mb-3">
-              <Facebook className="size-7" />
-            </div>
-            <h3 className="text-sm font-bold text-foreground">Connect Facebook Page</h3>
-            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
-              Connect your official Facebook Business Page to automatically reply to feed comments, initiate private Messenger replies, and qualify leads.
-            </p>
-            <div className="mt-5 w-full">
-              <Button size="sm" asChild className="w-full font-semibold bg-[#1877F2] hover:bg-[#166FE5] text-white">
-                <a href="/api/auth/meta/authorize?platform=facebook">
-                  <Plus className="size-4 mr-1.5" />
-                  Connect Facebook Page
-                </a>
-              </Button>
-            </div>
-          </Card>
-        </div>
+        /* Zero Accounts Empty State: Single Unified Login Card */
+        <Card className="border-dashed border-border bg-card/60 p-8 flex flex-col justify-between text-center items-center max-w-md mx-auto">
+          <div className="flex size-14 items-center justify-center rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white shadow-xs mb-3">
+            <Instagram className="size-7" />
+          </div>
+          <h3 className="text-base font-bold text-foreground">Connect Instagram Professional</h3>
+          <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
+            Link your Instagram Business or Creator account via Meta Unified Login to listen to post and Reel comments, send automated replies, and capture qualified leads.
+          </p>
+          <div className="mt-5 w-full flex flex-col items-center">
+            <Button size="sm" asChild className="w-full font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs">
+              <a href="/api/auth/meta/authorize?platform=instagram">
+                <Plus className="size-4 mr-1.5" />
+                Connect Instagram Account
+              </a>
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowProfessionalGuide(true)}
+              className="mt-2.5 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+            >
+              Requires a free Professional account (view guide)
+            </button>
+          </div>
+        </Card>
       )}
     </div>
   );

@@ -5,7 +5,13 @@ import { db } from "@/lib/db/client";
 import { fetchInstagramMedia, fetchFacebookPagePosts, MetaGraphError } from "@/lib/meta/client";
 
 export async function GET(req) {
-  const session = await getCurrentSession(req);
+  let session = null;
+  try {
+    session = await getCurrentSession(req);
+  } catch (sessErr) {
+    console.error("[InstagramMediaAPI] Session resolution error:", sessErr.message);
+  }
+
   if (!session || !session.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,8 +34,8 @@ export async function GET(req) {
       (a) => a.id === accountId || a.instagramBusinessId === accountId
     );
 
-    // If super admin and not found in org, allow super admin inspection
-    if (!account && session.isSuperAdmin && accountId) {
+    // If not found in active org, look across user's authorized workspaces
+    if (!account && accountId) {
       const allAccounts = await accountStore.listAllAccounts();
       account = allAccounts.find(
         (a) => a.id === accountId || a.instagramBusinessId === accountId
