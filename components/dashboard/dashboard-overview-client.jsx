@@ -35,7 +35,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ConnectInstagramModal } from "@/components/dashboard/connect-instagram-modal";
 
 export function DashboardOverviewClient({ initialOverviewData }) {
   const router = useRouter();
@@ -51,7 +50,6 @@ export function DashboardOverviewClient({ initialOverviewData }) {
   const [mediaError, setMediaError] = React.useState(null);
   const [mediaFilter, setMediaFilter] = React.useState("all"); // 'all' | 'video' | 'image'
   const [isDisconnecting, setIsDisconnecting] = React.useState(false);
-  const [connectModalOpen, setConnectModalOpen] = React.useState(false);
   const [actionNotice, setActionNotice] = React.useState(
     successParam === "connected"
       ? {
@@ -348,11 +346,10 @@ export function DashboardOverviewClient({ initialOverviewData }) {
               step="1"
               title="Connect your Instagram Professional account"
               description="Authorize RawReply to receive comment webhooks and send automated direct messages."
-              onClick={!isConnected ? () => setConnectModalOpen(true) : undefined}
-              href="/dashboard/accounts"
+              href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard"
               actionLabel={isConnected ? "Linked" : "Connect Account"}
               completed={isConnected}
-              isLink={isConnected}
+              isLink={!isConnected}
             />
             <ChecklistStep
               step="2"
@@ -479,13 +476,11 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                   </div>
                 </div>
 
-                <Button
-                  size="sm"
-                  onClick={() => setConnectModalOpen(true)}
-                  className="w-full bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:opacity-95 text-white font-semibold shadow-xs"
-                >
-                  <Instagram className="size-4 mr-1.5" />
-                  Connect Instagram Account
+                <Button size="sm" className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold" asChild>
+                  <a href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard">
+                    <Instagram className="size-4 mr-1.5" />
+                    Connect Instagram Account
+                  </a>
                 </Button>
               </div>
             )}
@@ -921,16 +916,11 @@ export function DashboardOverviewClient({ initialOverviewData }) {
           </div>
         </div>
       )}
-      {/* Connect Instagram Modal for Direct vs Facebook Selection */}
-      <ConnectInstagramModal
-        isOpen={connectModalOpen}
-        onClose={() => setConnectModalOpen(false)}
-      />
     </div>
   );
 }
 
-function ChecklistStep({ step, title, description, href, actionLabel, completed, isLink = true, onClick }) {
+function ChecklistStep({ step, title, description, href, actionLabel, completed, isLink = true }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3 transition-colors hover:bg-muted/20">
       <div className="flex items-start gap-3">
@@ -948,20 +938,12 @@ function ChecklistStep({ step, title, description, href, actionLabel, completed,
           </p>
         </div>
       </div>
-      {completed ? (
-        <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 text-xs">
-          {actionLabel}
-        </Badge>
-      ) : onClick ? (
-        <Button variant="outline" size="xs" onClick={onClick} className="shrink-0 text-xs">
-          {actionLabel}
-        </Button>
-      ) : isLink ? (
-        <Button variant="outline" size="xs" asChild className="shrink-0 text-xs">
+      {isLink ? (
+        <Button variant="outline" size="xs" asChild className="shrink-0">
           <Link href={href}>{actionLabel}</Link>
         </Button>
       ) : (
-        <Badge variant="outline" className="text-muted-foreground shrink-0 text-xs">
+        <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 text-xs">
           {actionLabel}
         </Badge>
       )}
