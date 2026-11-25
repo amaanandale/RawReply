@@ -49,14 +49,6 @@ export default function AccountsPage() {
       <PageHeader
         title="Connected Accounts"
         description="Connect your Instagram Professional accounts via the official Meta Unified Login API v21.0."
-        actions={
-          <Button size="sm" asChild className="min-h-[44px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs">
-            <a href="/api/auth/meta/authorize?platform=instagram">
-              <Instagram className="size-4 mr-1.5" />
-              Connect Instagram Account
-            </a>
-          </Button>
-        }
       />
 
       {/* Main Account Management Interface with Suspense boundary */}

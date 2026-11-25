@@ -223,24 +223,25 @@ export function AutomationsManager() {
   }, [selectPostParam, mediaItems, builderOpen, editingAutomation, handleOpenBuilderForMedia]);
 
   // Open Builder for Editing an Existing Automation
-  const handleOpenEditAutomation = (auto) => {
+  const handleOpenEditAutomation = (auto, mediaItem = null) => {
     setEditingAutomation(auto);
     setSelectedMediaForBuilder({
-      id: auto.postId,
-      mediaType: "POST",
-      caption: auto.postCaption || "",
-      thumbnailUrl: auto.postThumbnailUrl,
-      permalink: auto.postPermalink,
-      platform: auto.platform || "instagram",
+      id: auto.postId || auto.post_id || mediaItem?.id,
+      mediaType: mediaItem?.mediaType || "POST",
+      caption: auto.postCaption || auto.post_caption || mediaItem?.caption || "",
+      thumbnailUrl: auto.postThumbnailUrl || auto.post_thumbnail_url || mediaItem?.thumbnailUrl || mediaItem?.mediaUrl,
+      permalink: auto.postPermalink || auto.post_permalink || mediaItem?.permalink,
+      platform: auto.platform || selectedAccount?.platform || "instagram",
     });
-    setFormName(auto.name);
-    setFormTriggerType(auto.triggerType);
-    setFormKeywords(auto.triggerKeywords ? auto.triggerKeywords.join(", ") : (auto.triggerKeyword || ""));
-    setFormKeywordMatchType(auto.keywordMatchType || "contains");
-    setFormPublicReplyEnabled(auto.publicReplyEnabled);
-    setFormPublicReplyText(auto.publicReplyText || "");
-    setFormDmEnabled(auto.dmEnabled);
-    setFormDmText(auto.dmMessageText || "");
+    setFormName(auto.name || "");
+    setFormTriggerType(auto.triggerType || auto.trigger_type || "comment");
+    const rawKeywords = auto.triggerKeywords || auto.trigger_keywords || auto.triggerKeyword || auto.trigger_keyword;
+    setFormKeywords(Array.isArray(rawKeywords) ? rawKeywords.join(", ") : (rawKeywords || ""));
+    setFormKeywordMatchType(auto.keywordMatchType || auto.keyword_match_type || "contains");
+    setFormPublicReplyEnabled(Boolean(auto.publicReplyEnabled ?? auto.public_reply_enabled));
+    setFormPublicReplyText(auto.publicReplyText || auto.public_reply_text || "");
+    setFormDmEnabled(Boolean(auto.dmEnabled ?? auto.dm_enabled));
+    setFormDmText(auto.dmMessageText || auto.dm_message_text || auto.dm_text || "");
     setFormError(null);
     setFormSuccess(null);
     setBuilderOpen(true);
@@ -567,10 +568,21 @@ export function AutomationsManager() {
                   const itemPlatform = item.platform || (isFacebookAccount ? "facebook" : "instagram");
                   const isItemFb = itemPlatform === "facebook";
 
+                  // Find if an automation already exists for this post (normalizing 'med_' prefix)
+                  const existingAuto = automations.find((a) => {
+                    const aPostId = String(a.postId || a.post_id || "").replace(/^med_/, "");
+                    const currentPostId = String(item.id || "").replace(/^med_/, "");
+                    return aPostId && currentPostId && aPostId === currentPostId;
+                  });
+
                   return (
                     <Card
                       key={item.id}
-                      className="border border-border bg-card overflow-hidden shadow-xs hover:border-primary-accent/40 transition-all flex flex-col justify-between group"
+                      className={`border bg-card overflow-hidden shadow-xs transition-all flex flex-col justify-between group ${
+                        existingAuto
+                          ? "border-emerald-300 dark:border-emerald-800/60 ring-1 ring-emerald-500/10"
+                          : "border-border hover:border-primary-accent/40"
+                      }`}
                     >
                       {/* Media Thumbnail Container */}
                       <div className="relative aspect-square w-full bg-black/90 overflow-hidden">
@@ -607,6 +619,25 @@ export function AutomationsManager() {
                             )}
                             {item.mediaType}
                           </Badge>
+
+                          {existingAuto && (
+                            <Badge
+                              className={`border-none text-[9px] font-bold uppercase py-0.5 px-2 backdrop-blur-xs shadow-xs flex items-center gap-1 ${
+                                existingAuto.status === "active"
+                                  ? "bg-emerald-600/90 text-white"
+                                  : "bg-amber-600/90 text-white"
+                              }`}
+                            >
+                              <span
+                                className={`size-1.5 rounded-full ${
+                                  existingAuto.status === "active"
+                                    ? "bg-white animate-pulse"
+                                    : "bg-amber-200"
+                                }`}
+                              />
+                              {existingAuto.status === "active" ? "Active" : "Paused"}
+                            </Badge>
+                          )}
                         </div>
 
                         {/* External Link */}
@@ -635,14 +666,26 @@ export function AutomationsManager() {
                           </div>
                         </div>
 
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenBuilderForMedia(item)}
-                          className="w-full text-xs font-semibold bg-primary-accent hover:bg-primary-accent/90 text-white min-h-[36px]"
-                        >
-                          <Zap className="size-3.5 mr-1.5" />
-                          Create Automation
-                        </Button>
+                        {existingAuto ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenEditAutomation(existingAuto, item)}
+                            className="w-full text-xs font-semibold border-emerald-500/50 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 min-h-[36px]"
+                          >
+                            <Edit className="size-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+                            Edit Automation
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenBuilderForMedia(item)}
+                            className="w-full text-xs font-semibold bg-primary-accent hover:bg-primary-accent/90 text-white min-h-[36px]"
+                          >
+                            <Zap className="size-3.5 mr-1.5" />
+                            Create Automation
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   );

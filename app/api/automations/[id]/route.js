@@ -163,3 +163,6 @@ export async function DELETE(req, { params }) {
   }
 }
 
+export const PUT = PATCH;
+
+

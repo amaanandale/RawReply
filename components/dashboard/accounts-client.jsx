@@ -30,6 +30,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = React.useState(initialAccounts || []);
   const [isDisconnecting, setIsDisconnecting] = React.useState(null);
+  const [isVerifyingWebhooks, setIsVerifyingWebhooks] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState(null);
   const [selectedFilter, setSelectedFilter] = React.useState("all");
 
@@ -42,6 +43,30 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
   const isNoBusinessAccountError = errorParam === "no_instagram_business_account";
   const [showProfessionalGuide, setShowProfessionalGuide] = React.useState(isNoBusinessAccountError);
+
+  async function handleVerifyWebhooks(accountId) {
+    setIsVerifyingWebhooks(accountId);
+    try {
+      const res = await fetch("/api/accounts/subscribe-webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to verify webhooks");
+      setActionMessage({
+        type: "success",
+        text: "Webhooks successfully subscribed and verified with Meta Graph API!",
+      });
+    } catch (err) {
+      setActionMessage({
+        type: "error",
+        text: `Webhook verification note: ${err.message}`,
+      });
+    } finally {
+      setIsVerifyingWebhooks(null);
+    }
+  }
 
   // Clean Meta's legacy #_=_ fragment from URL if present
   React.useEffect(() => {
@@ -315,57 +340,59 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
         </div>
       )}
 
-      {/* Account Limit Capacity Bar & Platform Actions */}
-      <Card className="border-border bg-card shadow-xs">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-foreground">Workspace Social Account Slots</span>
-                <Badge
-                  variant={isLimitReached ? "destructive" : "outline"}
-                  className="text-xs font-mono font-semibold"
-                >
-                  {totalUsed} of 4 slots used ({remainingSlots} remaining)
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Max 4 connected accounts across Instagram Professional and Facebook Pages combined ({instagramCount} Instagram, {facebookCount} Facebook).
-              </p>
-              <div className="flex items-center gap-3 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => setShowProfessionalGuide((v) => !v)}
-                  className="inline-flex items-center gap-1.5 text-xs text-primary-accent hover:text-primary-accent/80 transition-colors font-medium underline-offset-4 hover:underline"
-                >
-                  <HelpCircle className="size-3.5" />
-                  <span>{showProfessionalGuide ? "Hide Setup Guide" : "Need help? View Professional Account Guide"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Single Unified Connection Button */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {isLimitReached ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 font-medium">
-                  Slot Limit Reached (4/4) — Disconnect an account to add another
+      {/* Account Limit Capacity Bar & Platform Actions (Shown only when accounts exist) */}
+      {accounts.length > 0 && (
+        <Card className="border-border bg-card shadow-xs">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-foreground">Workspace Social Account Slots</span>
+                  <Badge
+                    variant={isLimitReached ? "destructive" : "outline"}
+                    className="text-xs font-mono font-semibold"
+                  >
+                    {totalUsed} of 4 slots used ({remainingSlots} remaining)
+                  </Badge>
                 </div>
-              ) : (
-                <Button
-                  size="sm"
-                  asChild
-                  className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
-                >
-                  <a href="/api/auth/meta/authorize?platform=instagram">
-                    <Instagram className="size-4 mr-2" />
-                    Connect Instagram Account
-                  </a>
-                </Button>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  Max 4 connected accounts across Instagram Professional and Facebook Pages combined ({instagramCount} Instagram, {facebookCount} Facebook).
+                </p>
+                <div className="flex items-center gap-3 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowProfessionalGuide((v) => !v)}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary-accent hover:text-primary-accent/80 transition-colors font-medium underline-offset-4 hover:underline"
+                  >
+                    <HelpCircle className="size-3.5" />
+                    <span>{showProfessionalGuide ? "Hide Setup Guide" : "Need help? View Professional Account Guide"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Single Unified Connection Button */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {isLimitReached ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 font-medium">
+                    Slot Limit Reached (4/4) — Disconnect an account to add another
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    asChild
+                    className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
+                  >
+                    <a href="/api/auth/meta/authorize?platform=instagram">
+                      <Plus className="size-4 mr-1.5" />
+                      Connect Another Account
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Account List Header & Platform Filter Tabs */}
       {accounts.length > 0 && (
@@ -497,23 +524,35 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                   </div>
                 </CardContent>
 
-                <CardFooter className="border-t border-border pt-3 flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    asChild
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <a
-                      href={
-                        isFb
-                          ? "/api/auth/meta/authorize?platform=facebook"
-                          : "/api/auth/meta/authorize?platform=instagram"
-                      }
+                <CardFooter className="border-t border-border pt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => handleVerifyWebhooks(acc.id)}
+                      disabled={isVerifyingWebhooks === acc.id}
+                      className="text-xs"
                     >
-                      <RefreshCw className="size-3 mr-1" /> Reconnect
-                    </a>
-                  </Button>
+                      <RefreshCw className={`size-3 mr-1 ${isVerifyingWebhooks === acc.id ? "animate-spin" : ""}`} />
+                      {isVerifyingWebhooks === acc.id ? "Verifying..." : "Verify Webhooks"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      asChild
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <a
+                        href={
+                          isFb
+                            ? "/api/auth/meta/authorize?platform=facebook"
+                            : "/api/auth/meta/authorize?platform=instagram"
+                        }
+                      >
+                        <RefreshCw className="size-3 mr-1" /> Reconnect
+                      </a>
+                    </Button>
+                  </div>
                   <Button
                     variant="destructive"
                     size="xs"

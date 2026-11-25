@@ -569,25 +569,17 @@ export function DashboardOverviewClient({ initialOverviewData }) {
 
         {/* Media Grid or Disconnected Empty State */}
         {!isConnected ? (
-          <Card className="border-dashed border-border bg-card/60 p-8 sm:p-12 text-center">
-            <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
-              <div className="flex size-14 items-center justify-center rounded-full bg-primary-accent-light text-primary-accent border border-primary-accent/20">
-                <Instagram className="size-7" />
+          <Card className="border-dashed border-border bg-card/40 p-6 sm:p-8 text-center">
+            <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-2">
+              <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Instagram className="size-5" />
               </div>
-              <h4 className="text-base font-bold text-foreground">
-                Connect your Instagram account to view media
+              <h4 className="text-sm font-semibold text-foreground">
+                Media Library Awaiting Connection
               </h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Once your Instagram Professional account is connected, your published posts, videos, and Reels will appear here automatically so you can configure comment-to-DM triggers.
+                Connect your Instagram Professional account above to automatically load your published posts, videos, and Reels here and set up automated comment triggers.
               </p>
-              <div className="pt-2">
-                <Button size="sm" asChild className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs">
-                  <a href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard">
-                    <Instagram className="size-4 mr-2" />
-                    Connect Instagram Account
-                  </a>
-                </Button>
-              </div>
             </div>
           </Card>
         ) : mediaLoading ? (
@@ -628,11 +620,20 @@ export function DashboardOverviewClient({ initialOverviewData }) {
             {filteredMedia.map((item) => {
               const isVideo = item.mediaType === "VIDEO";
               const displayImage = item.thumbnailUrl || item.mediaUrl;
+              const existingAuto = (overview?.automations || []).find((a) => {
+                const aPostId = String(a.postId || a.post_id || "").replace(/^med_/, "");
+                const currentPostId = String(item.id || "").replace(/^med_/, "");
+                return aPostId && currentPostId && aPostId === currentPostId;
+              });
 
               return (
                 <Card
                   key={item.id}
-                  className="border-border bg-card overflow-hidden shadow-xs hover:border-border/80 transition-all flex flex-col justify-between group"
+                  className={`overflow-hidden border bg-card shadow-xs transition-all flex flex-col justify-between group ${
+                    existingAuto
+                      ? "border-emerald-300 dark:border-emerald-800/60 ring-1 ring-emerald-500/10"
+                      : "border-border hover:border-primary-accent/40"
+                  }`}
                 >
                   <div className="relative aspect-square w-full bg-muted overflow-hidden">
                     {displayImage ? (
@@ -649,8 +650,8 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                       </div>
                     )}
 
-                    {/* Media Type Badge */}
-                    <div className="absolute top-2.5 left-2.5">
+                    {/* Media Type Badge & Status */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                       <Badge
                         variant="secondary"
                         className="bg-black/60 text-white backdrop-blur-xs text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 inline-flex items-center gap-1 border-0"
@@ -658,6 +659,13 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                         {isVideo ? <Video className="size-3" /> : <ImageIcon className="size-3" />}
                         {isVideo ? "Reel" : "Post"}
                       </Badge>
+
+                      {existingAuto && (
+                        <Badge className="bg-emerald-600/90 text-white text-[9px] font-bold uppercase py-0.5 px-2 border-0 shadow-xs flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-white animate-pulse" />
+                          Active
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Open on Instagram Link */}
@@ -701,14 +709,28 @@ export function DashboardOverviewClient({ initialOverviewData }) {
 
                     {/* Trigger Action Button */}
                     <div className="pt-2">
-                      <Button
-                        size="xs"
-                        className="w-full text-xs font-semibold bg-primary-accent hover:bg-primary-accent-dark text-white"
-                        onClick={() => handleOpenQuickBuilder(item)}
-                      >
-                        <Sparkles className="size-3 mr-1.5" />
-                        Create Automation
-                      </Button>
+                      {existingAuto ? (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="w-full text-xs font-semibold border-emerald-500/50 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                          asChild
+                        >
+                          <Link href={`/dashboard/automations?selectPost=${item.id}`}>
+                            <Sparkles className="size-3 mr-1.5 text-emerald-600" />
+                            Edit Automation
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="xs"
+                          className="w-full text-xs font-semibold bg-primary-accent hover:bg-primary-accent-dark text-white"
+                          onClick={() => handleOpenQuickBuilder(item)}
+                        >
+                          <Sparkles className="size-3 mr-1.5" />
+                          Create Automation
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
