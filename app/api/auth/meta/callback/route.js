@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
+import { createAccessToken } from "@/lib/auth/tokens";
+import { setAuthCookies } from "@/lib/auth/cookies";
 import { getMetaRedirectUri } from "@/lib/meta/constants";
 import {
   validateAndConsumeOAuthState,
@@ -366,7 +368,27 @@ export async function GET(req) {
     destinationUrl.searchParams.set("success", "connected");
     destinationUrl.searchParams.set("platform", "instagram");
     destinationUrl.searchParams.set("username", primaryTarget.instagram.username);
-    return redirectWithClearedCookie(destinationUrl.toString());
+
+    const redirectResponse = redirectWithClearedCookie(destinationUrl.toString());
+
+    // Synchronize user session cookie so the browser lands in the exact workspace organization
+    const activeUserId = session?.user?.id || validation.userId;
+    if (activeUserId) {
+      try {
+        const freshAccessToken = await createAccessToken({
+          userId: activeUserId,
+          sessionId: session?.sessionId || `ses_${Date.now()}`,
+          orgId: organizationId,
+          role: session?.role || "owner",
+          isSuperAdmin: Boolean(session?.isSuperAdmin),
+        });
+        setAuthCookies(redirectResponse, { accessToken: freshAccessToken });
+      } catch (tokenErr) {
+        console.warn("[MetaOAuthCallback] Session token sync note:", tokenErr.message);
+      }
+    }
+
+    return redirectResponse;
   } catch (err) {
     console.error(
       JSON.stringify({

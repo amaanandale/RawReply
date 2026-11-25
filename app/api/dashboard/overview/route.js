@@ -15,10 +15,7 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const organizationId = session.organizationId;
-  if (!organizationId) {
-    return NextResponse.json({ error: "No active workspace found." }, { status: 400 });
-  }
+  const organizationId = session.organizationId || "default_org";
 
   try {
     const [accounts, leadStats, automations, recentLeadsData] = await Promise.all([

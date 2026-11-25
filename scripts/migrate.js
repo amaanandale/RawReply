@@ -4,6 +4,26 @@ import pg from "pg";
 
 const { Pool } = pg;
 
+// Load environment variables from .env.local / .env if not already set
+if (!process.env.DATABASE_URL) {
+  for (const envFile of [".env.local", ".env"]) {
+    const envPath = path.join(process.cwd(), envFile);
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+          const [key, ...rest] = trimmed.split("=");
+          const val = rest.join("=").replace(/^["']|["']$/g, "").trim();
+          if (!process.env[key.trim()]) {
+            process.env[key.trim()] = val;
+          }
+        }
+      }
+    }
+  }
+}
+
 async function runMigrations() {
   console.log("=================================================");
   console.log("RawReply Database Migration Runner");
@@ -54,7 +74,7 @@ async function runMigrations() {
   const pool = new Pool({
     connectionString: databaseUrl,
     ssl:
-      process.env.NODE_ENV === "production" && !databaseUrl.includes("localhost")
+      !databaseUrl.includes("localhost") && !databaseUrl.includes("127.0.0.1")
         ? { rejectUnauthorized: false }
         : false,
   });

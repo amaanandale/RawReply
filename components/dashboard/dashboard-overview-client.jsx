@@ -103,15 +103,13 @@ export function DashboardOverviewClient({ initialOverviewData }) {
     }
   }, []);
 
-  // Refresh automatically if arriving from OAuth redirect with success
+  // Always hydrate latest live data on mount and when arriving from OAuth redirect
   React.useEffect(() => {
-    if (successParam === "connected") {
-      const timer = setTimeout(() => {
-        refreshOverview();
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [successParam, refreshOverview]);
+    const timer = setTimeout(() => {
+      refreshOverview();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [refreshOverview]);
 
   // Fetch Instagram posts & Reels when an account is connected
   const fetchMedia = React.useCallback(async (accountId, force = false) => {
