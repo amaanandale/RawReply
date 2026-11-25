@@ -14,6 +14,11 @@ import {
   STATE_COOKIE_NAME,
 } from "../lib/meta/oauth-state.js";
 import {
+  buildInstagramDirectAuthorizeUrl,
+  getInstagramDirectCredentials,
+} from "../lib/meta/instagram-direct.js";
+import { getInstagramRedirectUri } from "../lib/meta/constants.js";
+import {
   verifyWebhookSignature,
   normalizeWebhookEvents,
 } from "../lib/meta/webhooks.js";
@@ -523,6 +528,48 @@ async function runTests() {
       url.searchParams.get("redirect_uri"),
       "https://rawreply-git-main-amaanandales-projects.vercel.app/api/auth/meta/callback"
     );
+  });
+
+  test("Instagram Direct: Authorization URL construction compliance with Instagram OAuth", () => {
+    const state = "direct_instagram_test_state_123456789";
+    const authUrl = buildInstagramDirectAuthorizeUrl({
+      state,
+      clientId: "1531237922145783",
+      redirectUri: "https://rawreply.vercel.app/api/auth/instagram/callback",
+    });
+
+    assert.ok(authUrl.startsWith("https://www.instagram.com/oauth/authorize?"));
+    const url = new URL(authUrl);
+    assert.strictEqual(url.searchParams.get("client_id"), "1531237922145783");
+    assert.strictEqual(url.searchParams.get("response_type"), "code");
+    assert.strictEqual(url.searchParams.get("enable_fb_login"), "0");
+    assert.strictEqual(url.searchParams.get("force_authentication"), "1");
+    assert.strictEqual(url.searchParams.get("state"), state);
+    assert.strictEqual(url.searchParams.get("redirect_uri"), "https://rawreply.vercel.app/api/auth/instagram/callback");
+    assert.strictEqual(
+      url.searchParams.get("scope"),
+      "instagram_business_basic,instagram_business_manage_comments,instagram_business_manage_messages"
+    );
+  });
+
+  await asyncTest("Instagram Direct: State generation and consumption works for instagram_direct platform", async () => {
+    const { state, cookieValue } = generateSecureOAuthState({
+      organizationId: "org_ig_direct_test",
+      userId: "user_ig_direct",
+      platform: "instagram_direct",
+      returnTo: "/dashboard/accounts",
+    });
+
+    const result = await validateAndConsumeOAuthState({
+      stateParam: state,
+      cookieValue,
+      sessionOrgId: "org_ig_direct_test",
+    });
+
+    assert.strictEqual(result.valid, true);
+    assert.strictEqual(result.platform, "instagram_direct");
+    assert.strictEqual(result.organizationId, "org_ig_direct_test");
+    assert.strictEqual(result.returnTo, "/dashboard/accounts");
   });
 
 

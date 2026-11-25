@@ -25,11 +25,27 @@ export async function GET(req) {
     `${req.headers.get("x-forwarded-proto") || "http"}://${req.headers.get("host") || "localhost:3000"}`;
   const accountsUrl = new URL("/dashboard/accounts", appUrl);
 
+  // If requested directly for direct Instagram Login, redirect to direct route
+  const provider = req.nextUrl.searchParams.get("provider");
+  if (provider === "instagram_direct" || provider === "direct") {
+    const directUrl = new URL("/api/auth/instagram/authorize", appUrl);
+    req.nextUrl.searchParams.forEach((val, key) => {
+      if (key !== "provider") directUrl.searchParams.set(key, val);
+    });
+    return NextResponse.redirect(directUrl.toString());
+  }
+
   const appId = process.env.META_APP_ID || META_DEFAULT_APP_ID;
-  const configId =
-    process.env.META_CONFIG_ID && process.env.META_CONFIG_ID !== "none"
-      ? process.env.META_CONFIG_ID
-      : META_DEFAULT_CONFIG_ID;
+  const forceStandard =
+    req.nextUrl.searchParams.get("config") === "off" ||
+    req.nextUrl.searchParams.get("mode") === "standard" ||
+    req.nextUrl.searchParams.get("standard") === "1";
+
+  const configId = forceStandard
+    ? null
+    : (process.env.META_CONFIG_ID && process.env.META_CONFIG_ID !== "none"
+        ? process.env.META_CONFIG_ID
+        : META_DEFAULT_CONFIG_ID);
   const appSecret = process.env.META_APP_SECRET || META_DEFAULT_APP_SECRET;
 
   // 1. Verify Meta environment configuration

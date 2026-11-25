@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConnectInstagramModal } from "@/components/dashboard/connect-instagram-modal";
 
 export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const [isDisconnecting, setIsDisconnecting] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState(null);
   const [selectedFilter, setSelectedFilter] = React.useState("all");
+  const [connectModalOpen, setConnectModalOpen] = React.useState(false);
 
   const errorParam = searchParams.get("error");
   const successParam = searchParams.get("success");
@@ -354,22 +356,20 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
-                    asChild
-                    variant="outline"
-                    className="h-8 text-xs border-primary-accent/30 hover:bg-primary-accent/5 text-foreground"
+                    onClick={() => setConnectModalOpen(true)}
+                    className="h-8 text-xs bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:opacity-95 text-white font-semibold shadow-xs"
                   >
-                    <a href="/api/auth/meta/authorize?platform=instagram">
-                      <Instagram className="size-3.5 mr-1.5 text-primary-accent" />
-                      + Add Instagram
-                    </a>
+                    <Instagram className="size-3.5 mr-1.5" />
+                    + Connect Instagram
                   </Button>
                   <Button
                     size="sm"
                     asChild
-                    className="h-8 text-xs bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                    variant="outline"
+                    className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300"
                   >
                     <a href="/api/auth/meta/authorize?platform=facebook">
-                      <Facebook className="size-3.5 mr-1.5 text-white" />
+                      <Facebook className="size-3.5 mr-1.5 text-[#1877F2]" />
                       + Add Facebook Page
                     </a>
                   </Button>
@@ -554,26 +554,49 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
       ) : (
         /* Zero Accounts Empty State */
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Option A: Instagram Card */}
-          <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-pink-50 text-pink-600 border border-pink-200 mb-3">
+          {/* Option A: Instagram Card with Dual Option Support */}
+          <Card className="border-2 border-primary-accent/30 bg-gradient-to-b from-primary-accent/5 via-card to-card p-6 flex flex-col justify-between text-center items-center shadow-xs">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white shadow-xs mb-3">
               <Instagram className="size-7" />
             </div>
-            <h3 className="text-sm font-bold text-foreground">Connect Instagram Professional</h3>
-            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
-              Link your Instagram Business or Creator account to listen to post and Reel comments, send automated replies, and capture qualified leads.
-            </p>
-            <div className="mt-5 w-full flex flex-col items-center">
-              <Button size="sm" asChild className="w-full font-semibold">
-                <a href="/api/auth/meta/authorize?platform=instagram">
-                  <Plus className="size-4 mr-1.5" />
-                  Connect Instagram Account
+            <div className="space-y-1">
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                <h3 className="text-sm font-bold text-foreground">Connect Instagram Professional</h3>
+                <Badge className="bg-emerald-600 text-white text-[10px] font-bold uppercase py-0">Recommended</Badge>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-sm">
+                Link your Instagram Business or Creator account to listen to post and Reel comments, send automated direct message replies, and capture qualified leads.
+              </p>
+            </div>
+
+            <div className="mt-5 w-full space-y-2">
+              <Button
+                size="sm"
+                asChild
+                className="w-full font-semibold bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:opacity-95 text-white shadow-xs h-9 text-xs"
+              >
+                <a href="/api/auth/instagram/authorize">
+                  <Instagram className="size-4 mr-2" />
+                  Continue with Instagram (Direct Login)
                 </a>
               </Button>
+
+              <Button
+                size="sm"
+                asChild
+                variant="outline"
+                className="w-full text-xs h-9 border-blue-200 text-blue-800 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300"
+              >
+                <a href="/api/auth/meta/authorize?platform=instagram">
+                  <Facebook className="size-4 mr-2 text-[#1877F2]" />
+                  Continue with Facebook (Page-Linked)
+                </a>
+              </Button>
+
               <button
                 type="button"
                 onClick={() => setShowProfessionalGuide(true)}
-                className="mt-2.5 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+                className="mt-1 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors block mx-auto"
               >
                 Requires a free Professional account (view guide)
               </button>
@@ -582,15 +605,17 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
           {/* Option B: Facebook Card */}
           <Card className="border-dashed border-border bg-card/60 p-6 flex flex-col justify-between text-center items-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-blue-50 text-[#1877F2] border border-blue-200 mb-3">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-[#1877F2] border border-blue-200 mb-3">
               <Facebook className="size-7" />
             </div>
-            <h3 className="text-sm font-bold text-foreground">Connect Facebook Page</h3>
-            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
-              Connect your official Facebook Business Page to automatically reply to feed comments, initiate private Messenger replies, and qualify leads.
-            </p>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-foreground">Connect Facebook Page</h3>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-sm">
+                Connect your official Facebook Business Page to automatically reply to feed comments, initiate private Messenger replies, and qualify leads.
+              </p>
+            </div>
             <div className="mt-5 w-full">
-              <Button size="sm" asChild className="w-full font-semibold bg-[#1877F2] hover:bg-[#166FE5] text-white">
+              <Button size="sm" asChild className="w-full font-semibold bg-[#1877F2] hover:bg-[#166FE5] text-white h-9 text-xs">
                 <a href="/api/auth/meta/authorize?platform=facebook">
                   <Plus className="size-4 mr-1.5" />
                   Connect Facebook Page
@@ -600,6 +625,12 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           </Card>
         </div>
       )}
+
+      {/* Shared Connect Instagram Modal for Seamless Direct/FB Choice */}
+      <ConnectInstagramModal
+        isOpen={connectModalOpen}
+        onClose={() => setConnectModalOpen(false)}
+      />
     </div>
   );
 }
