@@ -541,23 +541,42 @@ export function AutomationsManager() {
               ))}
             </div>
           ) : mediaItems.length === 0 ? (
-            <Card className="border border-dashed border-border bg-card p-12 text-center text-xs text-muted-foreground space-y-3">
-              <Video className="size-10 mx-auto text-muted-foreground/40" />
-              <h3 className="text-sm font-semibold text-foreground">
-                No Posts Found on this {isFacebookAccount ? "Facebook Page" : "Instagram Account"}
+            <Card className="border border-dashed border-border bg-card p-10 text-center text-xs text-muted-foreground space-y-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-muted mx-auto text-muted-foreground border border-border">
+                <Video className="size-6" />
+              </div>
+              <h3 className="text-sm font-bold text-foreground">
+                No Published Posts Found on {selectedAccount?.pageName || `@${selectedAccount?.username}`}
               </h3>
               <p className="max-w-md mx-auto text-muted-foreground leading-relaxed">
-                We queried the official Meta Graph API for {selectedAccount?.pageName || `@${selectedAccount?.username}`}, but no eligible posts were returned. Publish a post, then click Refresh.
+                We queried the official Meta Graph API, but no posts or Reels were returned yet. You can publish a post on Instagram and click Refresh, or create a trigger for Any Post right now!
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchMedia(selectedAccountId, true)}
-                className="mt-2 text-xs"
-              >
-                <RefreshCw className="size-3.5 mr-1.5" />
-                Refresh from Meta
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchMedia(selectedAccountId, true)}
+                  disabled={mediaLoading}
+                  className="text-xs h-8"
+                >
+                  <RefreshCw className={`size-3.5 mr-1.5 ${mediaLoading ? "animate-spin" : ""}`} />
+                  {mediaLoading ? "Refreshing..." : "Refresh from Meta"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    handleOpenBuilderForMedia({
+                      id: "any",
+                      caption: "All Posts & Reels (Any)",
+                      mediaType: "POST",
+                    })
+                  }
+                  className="text-xs h-8 bg-primary-accent hover:bg-primary-accent-dark text-white font-semibold"
+                >
+                  <Plus className="size-3.5 mr-1" />
+                  Create Trigger for Any Post
+                </Button>
+              </div>
             </Card>
           ) : (
             <>

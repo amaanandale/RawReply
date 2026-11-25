@@ -15,8 +15,11 @@ import {
   fetchUserFacebookPages,
   subscribePageToWebhooks,
   subscribeInstagramAccountToWebhooks,
+  fetchInstagramMedia,
+  fetchFacebookPagePosts,
 } from "@/lib/meta/client";
 import { accountStore } from "@/lib/storage/account-store";
+import { db } from "@/lib/db/client";
 import { logSystemError, ERROR_CATEGORIES, ERROR_SEVERITIES } from "@/lib/monitoring/error-logger";
 
 /**
@@ -348,6 +351,31 @@ export async function GET(req) {
       pageToken: primaryTarget.pageToken || longLivedUserToken,
       tokenExpiresAt,
     });
+
+    // Automatically sync recent media from Meta into Neon database
+    try {
+      const mediaResult = await fetchInstagramMedia({
+        instagramAccountId: primaryTarget.instagram.id,
+        accessToken: primaryTarget.pageToken || longLivedUserToken,
+        limit: 25,
+      });
+      if (mediaResult?.data?.length > 0) {
+        await db.saveInstagramMedia(
+          mediaResult.data,
+          organizationId,
+          primaryTarget.instagram.id,
+          "instagram"
+        );
+        console.log(
+          `[MetaOAuthCallback] Automatically synced ${mediaResult.data.length} posts for @${primaryTarget.instagram.username}`
+        );
+      }
+    } catch (mediaSyncErr) {
+      console.warn(
+        `[MetaOAuthCallback] Initial media sync note for @${primaryTarget.instagram.username}:`,
+        mediaSyncErr.message
+      );
+    }
 
     console.log(
       JSON.stringify({

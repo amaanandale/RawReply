@@ -569,25 +569,23 @@ export function DashboardOverviewClient({ initialOverviewData }) {
 
         {/* Media Grid or Disconnected Empty State */}
         {!isConnected ? (
-          <Card className="border-dashed border-border bg-card/60 p-8 sm:p-12 text-center">
-            <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
-              <div className="flex size-14 items-center justify-center rounded-full bg-primary-accent-light text-primary-accent border border-primary-accent/20">
-                <Instagram className="size-7" />
+          <Card className="border-dashed border-border bg-card/60 p-8 sm:p-10 text-center">
+            <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-2.5">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground border border-border">
+                <Zap className="size-6" />
               </div>
-              <h4 className="text-base font-bold text-foreground">
-                Connect your Instagram account to view media
+              <h4 className="text-sm font-bold text-foreground">
+                Automated Comment Triggers
               </h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Once your Instagram Professional account is connected, your published posts, videos, and Reels will appear here automatically so you can configure comment-to-DM triggers.
+                Connect your social account above to view your posts and Reels here. Any comment matching your keywords will instantly receive a public reply and direct message.
               </p>
-              <div className="pt-2">
-                <Button size="sm" asChild className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs">
-                  <a href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard">
-                    <Instagram className="size-4 mr-2" />
-                    Connect Instagram Account
-                  </a>
-                </Button>
-              </div>
+              <Link
+                href="/dashboard/accounts"
+                className="text-xs text-primary-accent hover:underline font-medium inline-flex items-center gap-1 pt-1"
+              >
+                View Connected Accounts <ArrowRight className="size-3" />
+              </Link>
             </div>
           </Card>
         ) : mediaLoading ? (
@@ -603,23 +601,40 @@ export function DashboardOverviewClient({ initialOverviewData }) {
           </div>
         ) : filteredMedia.length === 0 ? (
           <Card className="border-dashed border-border bg-card/60 p-8 text-center">
-            <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-2">
-              <ImageIcon className="size-8 text-muted-foreground" />
-              <h4 className="text-sm font-semibold text-foreground">No media found</h4>
+            <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary-accent/10 text-primary-accent border border-primary-accent/20">
+                <Sparkles className="size-6" />
+              </div>
+              <h4 className="text-sm font-bold text-foreground">
+                @{primaryAccount.username} Connected — Ready to Automate
+              </h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {mediaError
-                  ? `Notice: ${mediaError}. Click refresh or reconnect your account.`
-                  : `No ${mediaFilter === "all" ? "posts or Reels" : mediaFilter} found on @${primaryAccount.username}. Publish a post on Instagram and click Refresh.`}
+                  ? `Notice: ${mediaError}. Click refresh to retry syncing.`
+                  : `No published posts or Reels were returned from Instagram for @${primaryAccount.username} yet. Publish a post on Instagram and click Refresh, or create a trigger for Any Post / Custom Post URL below.`}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchMedia(primaryAccount.id, true)}
-                className="mt-2 text-xs"
-              >
-                <RefreshCw className="size-3 mr-1.5" />
-                Refresh Media
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchMedia(primaryAccount.id, true)}
+                  disabled={mediaLoading}
+                  className="text-xs h-8"
+                >
+                  <RefreshCw className={`size-3 mr-1.5 ${mediaLoading ? "animate-spin" : ""}`} />
+                  {mediaLoading ? "Syncing..." : "Sync Posts from Instagram"}
+                </Button>
+                <Button
+                  size="sm"
+                  asChild
+                  className="text-xs h-8 bg-primary-accent hover:bg-primary-accent-dark text-white font-semibold"
+                >
+                  <Link href="/dashboard/automations">
+                    <Plus className="size-3 mr-1" />
+                    New Trigger Workflow
+                  </Link>
+                </Button>
+              </div>
             </div>
           </Card>
         ) : (

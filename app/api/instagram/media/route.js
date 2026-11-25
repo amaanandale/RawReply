@@ -22,11 +22,11 @@ export async function GET(req) {
   }
 
   try {
-    // 1. Find account belonging to user's workspace
+    // 1. Find account belonging to user's workspace (or default to primary active account)
     const accounts = await accountStore.listAccounts(organizationId);
-    let account = accounts.find(
-      (a) => a.id === accountId || a.instagramBusinessId === accountId
-    );
+    let account = accountId
+      ? accounts.find((a) => a.id === accountId || a.instagramBusinessId === accountId)
+      : accounts[0];
 
     // If super admin and not found in org, allow super admin inspection
     if (!account && session.isSuperAdmin && accountId) {
@@ -38,7 +38,11 @@ export async function GET(req) {
 
     if (!account) {
       return NextResponse.json(
-        { error: "Instagram account not found in current workspace." },
+        {
+          success: false,
+          error: "No connected Instagram accounts or Facebook Pages found in current workspace.",
+          media: [],
+        },
         { status: 404 }
       );
     }
@@ -87,6 +91,10 @@ export async function GET(req) {
     const isFacebook = account.platform === "facebook";
 
     // 4. Fetch actual media from Meta Graph API (Instagram media or Facebook Page posts)
+    const fallbackToken = tokens.pageToken && tokens.accessToken && effectiveToken === tokens.pageToken
+      ? tokens.accessToken
+      : tokens.pageToken;
+
     const result = isFacebook
       ? await fetchFacebookPagePosts({
           pageId: account.pageId || account.id,
@@ -97,6 +105,7 @@ export async function GET(req) {
       : await fetchInstagramMedia({
           instagramAccountId: targetInstagramBusinessId,
           accessToken: effectiveToken,
+          fallbackToken,
           after: afterCursor,
           limit,
         });

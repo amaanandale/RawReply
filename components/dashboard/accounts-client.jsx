@@ -344,36 +344,40 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
               </div>
             </div>
 
-            {/* Two Distinct Connection Options */}
+            {/* Action Area based on connection state */}
             <div className="flex flex-wrap items-center gap-2.5">
               {isLimitReached ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 font-medium">
                   Slot Limit Reached (4/4) — Disconnect an account to add another
                 </div>
-              ) : (
-                <>
+              ) : totalUsed > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
                     asChild
                     variant="outline"
-                    className="min-h-[40px] sm:min-h-[36px] border-primary-accent/40 hover:bg-primary-accent/5 hover:border-primary-accent text-foreground"
+                    className="h-8 text-xs border-primary-accent/30 hover:bg-primary-accent/5 text-foreground"
                   >
                     <a href="/api/auth/meta/authorize?platform=instagram">
-                      <Instagram className="size-4 mr-2 text-primary-accent" />
-                      Connect Instagram
+                      <Instagram className="size-3.5 mr-1.5 text-primary-accent" />
+                      + Add Instagram
                     </a>
                   </Button>
                   <Button
                     size="sm"
                     asChild
-                    className="min-h-[40px] sm:min-h-[36px] bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                    className="h-8 text-xs bg-[#1877F2] hover:bg-[#166FE5] text-white"
                   >
                     <a href="/api/auth/meta/authorize?platform=facebook">
-                      <Facebook className="size-4 mr-2 text-white" />
-                      Connect Facebook Page
+                      <Facebook className="size-3.5 mr-1.5 text-white" />
+                      + Add Facebook Page
                     </a>
                   </Button>
-                </>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
+                  Select an account type below to get started ↓
+                </span>
               )}
             </div>
           </div>
