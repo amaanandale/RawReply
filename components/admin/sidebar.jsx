@@ -36,11 +36,6 @@ export const ADMIN_NAV_ITEMS = [
     icon: Building2,
   },
   {
-    title: "Subscriptions",
-    href: "/admin/subscriptions",
-    icon: CreditCard,
-  },
-  {
     title: "Automations",
     href: "/admin/automations",
     icon: Zap,

@@ -495,9 +495,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_org_user ON audit_logs (organization_i
 -- Synced compatibility with system_audit_logs if present
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'system_audit_logs' AND table_type = 'BASE TABLE') THEN
-        INSERT INTO audit_logs (id, organization_id, user_id, action, resource_type, resource_id, metadata, ip_address, user_agent, created_at)
-        SELECT id, organization_id, user_id, action, resource_type, resource_id, COALESCE(metadata, '{}'::jsonb), ip_address, user_agent, created_at
-        FROM system_audit_logs
+        INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, metadata, ip_address, created_at)
+        SELECT 
+            s.id, 
+            u.id, 
+            s.action, 
+            s.target_type, 
+            s.target_id, 
+            json_build_object('details', s.details, 'actor_email', s.actor_email, 'actor_id', s.actor_id)::jsonb, 
+            s.ip_address, 
+            s.created_at
+        FROM system_audit_logs s
+        LEFT JOIN users u ON u.id = s.actor_id
         ON CONFLICT (id) DO NOTHING;
     END IF;
 END $$;
@@ -550,6 +559,7 @@ ALTER TABLE system_errors ADD COLUMN IF NOT EXISTS resolution_notes TEXT NULL;
 ALTER TABLE system_errors ADD COLUMN IF NOT EXISTS occurrence_count INT DEFAULT 1 NOT NULL;
 ALTER TABLE system_errors ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL;
 ALTER TABLE system_errors ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL;
+ALTER TABLE system_errors ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL;
 
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_errors' AND column_name = 'fingerprint') THEN
@@ -581,6 +591,7 @@ CREATE TABLE IF NOT EXISTS webhook_events (
 ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(255) NULL;
 ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS payload JSONB NULL;
 ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS error_message TEXT NULL;
+ALTER TABLE webhook_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL;
 
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'webhook_events' AND column_name = 'dedup_key') THEN
