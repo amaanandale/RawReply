@@ -45,7 +45,15 @@ export async function POST(req) {
 
     return response;
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const msg = err.message || "Registration failed.";
+    const isUserFacing =
+      msg.includes("already exists") ||
+      msg.includes("must be at least") ||
+      msg.includes("Password") ||
+      msg.includes("valid email") ||
+      msg.includes("invitation");
+    const safeError = isUserFacing ? msg : "Registration failed. Please check your information and try again.";
+    return NextResponse.json({ error: safeError }, { status: 400 });
   }
 }
 

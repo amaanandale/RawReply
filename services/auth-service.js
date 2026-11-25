@@ -26,76 +26,31 @@ export const authService = {
   /**
    * Register a new user.
    * Creates an organization automatically if no invitation token is provided.
+   * Atomically executes in a single database transaction.
    */
   async register({ email, password, name, organizationName, invitationToken, userAgent, ipAddress }) {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Assert email is unique
-    const existing = await db.findUserByEmail(normalizedEmail);
-    if (existing) {
-      throw new Error("An account with this email address already exists.");
-    }
-
-    // 2. Hash password
+    // 1. Hash password with bcrypt cost factor >= 12
     const passwordHash = await hashPassword(password);
     const userId = generateId("usr");
 
-    const user = await db.createUser({
-      id: userId,
+    // 2. Atomically create user, organization, and owner membership in a single transaction
+    const { user, organizationId, role } = await db.registerUserWithOrganization({
+      userId,
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
+      organizationName,
+      invitationToken,
       status: "active",
-      isSuperAdmin: false,
-      platformRole: null,
+      authProvider: "local",
     });
 
-    let activeOrgId = null;
-
-    // 3. Check invitation or create default organization
-    if (invitationToken) {
-      const tokenHash = hashToken(invitationToken);
-      const invite = await db.findInvitationByTokenHash(tokenHash);
-      if (invite && !invite.accepted_at && new Date(invite.expires_at) > new Date()) {
-        await db.addOrganizationMember({
-          id: generateId("mem"),
-          organizationId: invite.organization_id,
-          userId,
-          role: invite.role,
-        });
-        await db.markInvitationAccepted(invite.id);
-        activeOrgId = invite.organization_id;
-      }
-    }
-
-    if (!activeOrgId) {
-      // Create user's initial organization
-      const orgName = (organizationName || `${name.trim()}'s Team`).trim();
-      const orgId = generateId("org");
-      let baseSlug = slugify(orgName) || "workspace";
-      let slug = `${baseSlug}-${crypto.randomBytes(3).toString("hex")}`;
-
-      const org = await db.createOrganization({
-        id: orgId,
-        name: orgName,
-        slug,
-      });
-
-      // Add user as Owner
-      await db.addOrganizationMember({
-        id: generateId("mem"),
-        organizationId: org.id,
-        userId,
-        role: ROLES.OWNER,
-      });
-
-      activeOrgId = org.id;
-    }
-
-    // 4. Create session & tokens
+    // 3. Create session & tokens
     const sessionResult = await createSession({
       userId,
-      activeOrganizationId: activeOrgId,
+      activeOrganizationId: organizationId,
       userAgent,
       ipAddress,
     });
@@ -105,8 +60,12 @@ export const authService = {
         id: user.id,
         name: user.name,
         email: user.email,
-        emailVerified: false,
+        emailVerified: Boolean(user.email_verified_at),
+        isSuperAdmin: Boolean(user.is_super_admin),
+        platformRole: user.platform_role || "customer",
       },
+      organizationId,
+      role,
       ...sessionResult,
     };
   },

@@ -32,6 +32,9 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
 
+      // Clear password state variable immediately from browser memory
+      setPassword("");
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Login failed. Please check your credentials.");
@@ -50,6 +53,7 @@ function LoginForm() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setPassword("");
       setLoading(false);
     }
   };

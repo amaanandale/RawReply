@@ -40,6 +40,9 @@ function SignUpForm() {
         }),
       });
 
+      // Clear password immediately from memory upon request completion
+      setPassword("");
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Registration failed.");
@@ -51,6 +54,7 @@ function SignUpForm() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setPassword("");
       setLoading(false);
     }
   };
@@ -97,6 +101,7 @@ function SignUpForm() {
                 id="name"
                 type="text"
                 required
+                autoComplete="name"
                 placeholder="Alex Morgan"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -116,6 +121,7 @@ function SignUpForm() {
                 id="email"
                 type="email"
                 required
+                autoComplete="email"
                 placeholder="alex@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -135,6 +141,7 @@ function SignUpForm() {
                 <input
                   id="orgName"
                   type="text"
+                  autoComplete="organization"
                   placeholder="Acme Growth Marketing"
                   value={organizationName}
                   onChange={(e) => setOrganizationName(e.target.value)}
@@ -155,6 +162,7 @@ function SignUpForm() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
