@@ -125,10 +125,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
   // Open OAuth in a popup window
   function handleConnectPopup(platform = "instagram") {
-    const url =
-      platform === "instagram"
-        ? "/api/auth/instagram/authorize?popup=1"
-        : "/api/auth/meta/authorize?platform=facebook&popup=1";
+    const url = `/api/auth/meta/authorize?platform=${platform}&popup=1`;
     const popup = window.open(url, "rawreply_oauth", "width=600,height=740,left=200,top=100,toolbar=no,menubar=no");
     popupRef.current = popup;
 

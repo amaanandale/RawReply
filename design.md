@@ -112,8 +112,8 @@ RawReply uses a refined neutral SaaS palette with a distinctive primary brand ac
   - Visual capacity bar displaying `X of 4 slots used (Y remaining)`.
   - Disconnect action with confirmation dialog.
 - **Dual Connection Actions**:
-  - **Continue with Instagram**: Primary emerald button (`bg-emerald-600 hover:bg-emerald-700 text-white`) triggering direct Instagram OAuth (`/api/auth/instagram/authorize` -> `https://www.instagram.com/oauth/authorize`).
-  - **Continue with Facebook**: Clean emerald-accent outline button triggering Facebook Page OAuth (`/api/auth/meta/authorize?platform=facebook`).
+  - **Continue with Instagram**: Primary emerald button (`bg-emerald-600 hover:bg-emerald-700 text-white`) triggering Meta Unified Login with Instagram onboarding (`/api/auth/meta/authorize?platform=instagram&popup=1` -> `https://www.facebook.com/dialog/oauth` with `config_id` and `extras={"setup":{"channel":"IG_API_ONBOARDING"}}`).
+  - **Continue with Facebook**: Clean emerald-accent outline button triggering Facebook Page OAuth (`/api/auth/meta/authorize?platform=facebook&popup=1`).
   - Both open in a 600x740 popup; on completion, `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', success: true, ... }, window.location.origin)` notifies the parent window. If the opener was severed (cross-origin or mobile), an automatic `window.location.replace('/dashboard/accounts?connected=1')` and meta-refresh fallback ensures the user immediately lands on their dashboard with accounts updated.
 - **Webhook Verification**:
   - "Verify Webhooks" button on each account card triggers `/api/accounts/subscribe-webhooks` to confirm Meta Graph API delivers `comments` and `messages` events.

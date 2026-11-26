@@ -54,21 +54,17 @@
 
 ## Meta & Instagram Integration Architecture
 
-### Dual-Route Connection Architecture: Direct Instagram & Facebook OAuth
-RawReply provides two independent, dedicated connection channels with seamless post-login return:
+### Meta Unified Login Architecture: Instagram Professional & Facebook OAuth
+RawReply connects social accounts via Meta's official Unified Login dialog (`https://www.facebook.com/dialog/oauth`):
 
-1. **Direct Instagram Login (`/api/auth/instagram/authorize`)**:
-   - Initiated via `/api/auth/instagram/authorize?popup=1` (green "Continue with Instagram" button).
-   - Opens direct Instagram authorization (`https://www.instagram.com/oauth/authorize`) with `client_id` (`INSTAGRAM_APP_ID || META_APP_ID`), `redirect_uri` (`/api/auth/instagram/callback`), and scopes `instagram_business_basic,instagram_business_manage_comments,instagram_business_manage_messages`.
-   - Callback handled at `/api/auth/instagram/callback`:
-     - Strips any trailing `#_` from authorization code.
-     - Exchanges code for short-lived token via `https://api.instagram.com/oauth/access_token`.
-     - Exchanges for 60-day long-lived token via `https://graph.instagram.com/access_token?grant_type=ig_exchange_token`.
-     - Fetches profile and initial posts/media via `https://graph.instagram.com/me`.
-     - Encrypts tokens with AES-256-GCM (`ENCRYPTION_SECRET`), upserts account into Neon `instagram_accounts` with `login_provider = 'instagram'`.
-2. **Facebook Page / Unified Login (`/api/auth/meta/authorize`)**:
+1. **Instagram Professional Connection (`/api/auth/meta/authorize?platform=instagram`)**:
+   - Initiated via `/api/auth/meta/authorize?platform=instagram&popup=1` (green "Continue with Instagram" button).
+   - Dynamically constructs `https://www.facebook.com/dialog/oauth` with `client_id` (`META_APP_ID`), `config_id` (`META_CONFIG_ID`), `display=popup`, and `extras={"setup":{"channel":"IG_API_ONBOARDING"}}`.
+   - Meta's official dialog authorizes Instagram Business and Creator accounts (both standalone via `/me/assigned_instagram_accounts` and Facebook Page-linked via `/me/accounts`).
+   - Any calls to `/api/auth/instagram/authorize` transparently redirect to this route to prevent Meta's `Invalid Request: Request parameters are invalid: Invalid platform app` error (which occurs if a Facebook App ID is passed to `instagram.com/oauth/authorize`).
+2. **Facebook Page Login (`/api/auth/meta/authorize?platform=facebook`)**:
    - Initiated via `/api/auth/meta/authorize?platform=facebook&popup=1` ("Continue with Facebook" button).
-   - Dynamically constructs `https://www.facebook.com/dialog/oauth` with `META_CONFIG_ID`, `display=popup`, and `extras={"setup":{"channel":"IG_API_ONBOARDING"}}`.
+   - Dynamically constructs `https://www.facebook.com/dialog/oauth` with `display=popup` and `FACEBOOK_PAGE_SCOPES` to connect Facebook Pages.
    - Callback handled at `/api/auth/meta/callback` connecting Facebook Pages or Facebook-linked Instagram accounts.
 3. **Resilient Post-Login Return & Redirect Fallback**:
    - When opened in a popup with an active opener, renders a lightweight HTML page that sends `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', success: true, username, platform }, window.location.origin)` (with wildcard fallback) and closes itself.
