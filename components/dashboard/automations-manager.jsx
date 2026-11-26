@@ -28,6 +28,7 @@ import {
   ArrowRight,
   SlidersHorizontal,
   ChevronDown,
+  Play,
 } from "lucide-react";
 import { Instagram, Facebook } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,14 @@ export function AutomationsManager() {
   const [historyAutomation, setHistoryAutomation] = React.useState(null);
   const [executions, setExecutions] = React.useState([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
+
+  // Diagnostic Test Pipeline Modal state
+  const [testModalOpen, setTestModalOpen] = React.useState(false);
+  const [testAutomation, setTestAutomation] = React.useState(null);
+  const [testCommentText, setTestCommentText] = React.useState("cost");
+  const [testCommenterUsername, setTestCommenterUsername] = React.useState("demo_customer");
+  const [testLoading, setTestLoading] = React.useState(false);
+  const [testResult, setTestResult] = React.useState(null);
 
   // Builder Form Fields
   const [formName, setFormName] = React.useState("");
@@ -365,6 +374,42 @@ export function AutomationsManager() {
       console.error("Failed to load executions:", err);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // Open Test Pipeline Simulation Modal
+  const handleOpenTestModal = (auto, e) => {
+    if (e) e.stopPropagation();
+    setTestAutomation(auto);
+    const defaultKeyword = auto?.triggerKeywords?.[0] || auto?.triggerKeyword || "cost";
+    setTestCommentText(defaultKeyword === "ANY_COMMENT" ? "Hello there!" : defaultKeyword);
+    setTestCommenterUsername("demo_customer");
+    setTestResult(null);
+    setTestModalOpen(true);
+  };
+
+  // Run Pipeline Simulation
+  const handleRunSimulation = async () => {
+    if (!testAutomation) return;
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/automations/test-simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: testAutomation.accountId || testAutomation.instagramAccountId,
+          postId: testAutomation.postId,
+          commentText: testCommentText,
+          commenterUsername: testCommenterUsername,
+        }),
+      });
+      const data = await res.json();
+      setTestResult(data.diagnostic || { status: "failed", summary: data.error || "Simulation failed" });
+    } catch (err) {
+      setTestResult({ status: "failed", summary: err.message, steps: [] });
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -667,15 +712,26 @@ export function AutomationsManager() {
                         </div>
 
                         {existingAuto ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenEditAutomation(existingAuto, item)}
-                            className="w-full text-xs font-semibold border-emerald-500/50 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 min-h-[36px]"
-                          >
-                            <Edit className="size-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-                            Edit Automation
-                          </Button>
+                          <div className="flex items-center gap-1.5 w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenEditAutomation(existingAuto, item)}
+                              className="flex-1 text-xs font-semibold border-emerald-500/50 bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 min-h-[36px]"
+                            >
+                              <Edit className="size-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+                              Edit Automation
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => handleOpenTestModal(existingAuto, e)}
+                              className="px-2.5 text-xs font-semibold border-primary-accent/40 text-primary-accent hover:bg-primary-accent/10 min-h-[36px]"
+                              title="Test trigger simulation"
+                            >
+                              <Sparkles className="size-3.5" />
+                            </Button>
+                          </div>
                         ) : (
                           <Button
                             size="sm"
@@ -924,6 +980,16 @@ export function AutomationsManager() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleOpenTestModal(auto, e)}
+                        className="text-xs h-8 border-primary-accent/30 text-primary-accent hover:bg-primary-accent/10"
+                      >
+                        <Sparkles className="size-3.5 mr-1 text-primary-accent" />
+                        Test Trigger
+                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -1458,6 +1524,165 @@ export function AutomationsManager() {
 
             <div className="p-3 border-t border-border bg-muted/20 text-right">
               <Button variant="ghost" size="sm" onClick={() => setHistoryModalOpen(false)} className="text-xs">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* TEST PIPELINE SIMULATION MODAL                             */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {testModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-xl border border-border bg-card text-card-foreground shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary-accent" />
+                  <span>Test Automation Pipeline: {testAutomation?.name}</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Simulate an incoming Meta comment event to verify account lookup, post matching, keyword triggers, and token encryption.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTestModalOpen(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 text-xs space-y-4">
+              {/* Simulation Input Card */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3.5 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">Test Comment Text</label>
+                    <Input
+                      value={testCommentText}
+                      onChange={(e) => setTestCommentText(e.target.value)}
+                      placeholder="e.g. cost, pricing, link"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">Simulated Commenter Handle</label>
+                    <Input
+                      value={testCommenterUsername}
+                      onChange={(e) => setTestCommenterUsername(e.target.value)}
+                      placeholder="e.g. external_customer"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    Target Post: <strong className="font-mono text-foreground">{testAutomation?.postId || "All posts"}</strong>
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={handleRunSimulation}
+                    disabled={testLoading}
+                    className="h-8 text-xs bg-primary-accent text-white"
+                  >
+                    {testLoading ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Play className="size-3.5 mr-1.5" />}
+                    Run Pipeline Simulation
+                  </Button>
+                </div>
+              </div>
+
+              {/* Diagnostic Results */}
+              {testResult && (
+                <div className="space-y-3">
+                  <div
+                    className={`rounded-lg border p-3 flex items-start gap-2.5 ${
+                      testResult.status === "success"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                        : testResult.status === "self_comment_warning"
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                        : "border-destructive/30 bg-destructive/10 text-destructive"
+                    }`}
+                  >
+                    {testResult.status === "success" ? (
+                      <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <p className="font-bold text-xs">
+                        {testResult.status === "success"
+                          ? "Pipeline Verification Passed"
+                          : testResult.status === "self_comment_warning"
+                          ? "Self-Comment Prevention Warning"
+                          : "Pipeline Simulation Note"}
+                      </p>
+                      <p className="text-[11px] leading-relaxed">{testResult.summary}</p>
+                    </div>
+                  </div>
+
+                  {/* Step Breakdown */}
+                  {Array.isArray(testResult.steps) && testResult.steps.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-xs text-foreground uppercase tracking-wider text-[10px]">
+                        Pipeline Step Breakdown
+                      </h4>
+                      <div className="divide-y divide-border border border-border rounded-lg bg-card overflow-hidden">
+                        {testResult.steps.map((s) => (
+                          <div key={s.step} className="p-3 flex items-start gap-3">
+                            <span
+                              className={`size-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${
+                                s.status === "pass"
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                  : s.status === "warning"
+                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                  : s.status === "info"
+                                  ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                                  : "bg-destructive/15 text-destructive"
+                              }`}
+                            >
+                              {s.status === "pass" ? "✓" : s.status === "warning" ? "!" : s.status === "info" ? "i" : "✕"}
+                            </span>
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-foreground text-xs">{s.title}</span>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[9px] uppercase font-bold py-0 ${
+                                    s.status === "pass"
+                                      ? "text-emerald-700 border-emerald-500/30"
+                                      : s.status === "warning"
+                                      ? "text-amber-700 border-amber-500/30"
+                                      : s.status === "info"
+                                      ? "text-blue-700 border-blue-500/30"
+                                      : "text-destructive border-destructive/30"
+                                  }`}
+                                >
+                                  {s.status}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">{s.summary}</p>
+                              {s.leadCapture && (
+                                <p className="text-[10px] text-primary-accent font-medium pt-0.5">
+                                  {s.leadCapture}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 border-t border-border bg-muted/20 text-right">
+              <Button variant="ghost" size="sm" onClick={() => setTestModalOpen(false)} className="text-xs">
                 Close
               </Button>
             </div>
