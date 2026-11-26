@@ -1,117 +1,239 @@
 # RawReply — Engineering Instructions
 
 > This is the permanent engineering instruction document for the RawReply project.
-> Read this file and design.md before every implementation task.
+> Read this file and `design.md` before every implementation task.
 
 ---
 
-## Architecture
+## Architecture Overview
 
-- Read `design.md` before every UI implementation.
-- Follow Next.js App Router architecture.
-- JavaScript only — no TypeScript.
-- Keep the architecture modular.
-- Keep components reusable.
-- Separate UI, validation, configuration, and business logic.
-- Do not introduce unnecessary abstraction layers.
-- Prefer React Server Components. Use Client Components only when necessary.
-- Use Next.js conventions for routing, layouts, and data fetching.
-- Keep secrets server-side. Never import server modules in client code.
+- **Framework**: Next.js 16.4.5 (App Router).
+- **Runtime & Deployment**: Node.js on Vercel Serverless Functions (`https://rawreply.vercel.app`).
+- **Language**: JavaScript only (`.js`, `.jsx`, `.mjs`) — strictly **no TypeScript**.
+- **Database Architecture**:
+  - Primary: Neon Serverless PostgreSQL (`DATABASE_URL`) with connection pooling (`pg.Pool`), SSL enabled, and migration runner (`lib/db/migrations/`).
+  - Fallback: Local persistent file-based JSON store (`data/auth_db.json` / `/tmp/data/auth_db.json`) for headless environments where `DATABASE_URL` is unavailable.
+- **Cryptography & Security**:
+  - Token Encryption at rest: AES-256-GCM authenticated encryption (`ENCRYPTION_SECRET`) with initialization vector (`iv`) and auth tag (`tag`) stored alongside ciphertext for all Meta/Instagram access tokens, page tokens, and Microsoft tokens (`lib/crypto/encryption.js`).
+  - Passwords: Salted bcrypt hashing with 10 rounds (`lib/auth/password.js`).
+  - Webhook Signatures: HMAC-SHA256 signature verification (`X-Hub-Signature-256`) using `META_APP_SECRET`.
+  - State Cookies: HMAC-SHA256 signed tamper-proof HttpOnly cookies (`rawreply_meta_oauth_state`) with 10-minute TTL.
+- **Modularity**:
+  - Keep components modular and reusable under `components/ui/` and `components/shared/`.
+  - Server-side business logic and stores in `lib/`.
+  - Prefer React Server Components for pages and data loading; use Client Components (`"use client"`) only where interactive state, popups, or hooks are needed.
+  - Zero tolerance for leaked secrets: never import server modules in client components.
 
-## Authentication & Team Management
+---
 
-- Use custom JWT authentication with short-lived access tokens (15m) and secure HttpOnly cookies.
-- Use cryptographically random refresh tokens stored as SHA-256 hashes at rest with rotation and reuse attack detection.
-- Passwords must be hashed using bcrypt (10 rounds).
-- Protect all dashboard routes (`/dashboard(.*)`) using Next.js middleware and server-side session verification.
-- Use internal multi-tenant Organization Workspaces for team management and collaboration.
-- Roles:
-  - **Owner**: Full workspace access, workspace settings, team management, and integrations.
-  - **Admin**: Manage automations, accounts, and integrations; access qualified leads; invite members.
-  - **Member**: Access assigned automations and view qualified leads.
-- Never bypass authentication to make UI appear functional. Enforce authorization server-side on every sensitive action.
+## Authentication, Multi-Tenancy & RBAC
 
-## Code Quality
+### Custom JWT Session Management
+- **Access Tokens**: Short-lived (15 minutes) signed JWT (`JWT_ACCESS_SECRET`, HS256) stored in HttpOnly, SameSite=Lax cookies (`rawreply_access_token`).
+- **Refresh Tokens**: Cryptographically random 32-byte hex strings stored as SHA-256 hashes at rest in the `sessions` table (30-day lifetime). Handled via HttpOnly cookie (`rawreply_refresh_token`).
+- **Token Rotation & Reuse Attack Detection**:
+  - Refreshing tokens issues a new access token and automatically rotates the refresh token.
+  - If an expired or already-rotated refresh token is reused, all sessions for that user family are immediately revoked.
+- **Route Protection**:
+  - Next.js Edge Middleware (`middleware.js`) protects `/dashboard(.*)` and `/admin(.*)`.
+  - Server-side session verification via `getCurrentSession(req)` enforces valid user identity and active organization context on every API request.
 
-- Never duplicate components or business logic.
-- Inspect existing files before creating new files.
-- Reuse existing utilities from `lib/`.
-- Avoid unnecessary packages — check if an existing dependency covers the need.
-- Remove unused imports and dead code.
-- Keep files focused and maintainable.
-- Use meaningful naming conventions.
-- Do not generate unnecessary placeholder files.
-- Use Zod for all external input validation.
-- Follow ESLint rules — no warnings in production code.
+### Multi-Tenancy & Workspace Isolation
+- Every business customer belongs to an **Organization** (`organizations`).
+- Every query operating on accounts, automations, media, leads, or executions **MUST strictly filter by `organization_id`**. Never rely on client-supplied organization IDs without verifying session membership.
+- Users belong to organizations via `organization_members` with roles:
+  - **`owner`**: Full workspace access, billing, workspace settings, integrations, and member management.
+  - **`admin`**: Manage automations, connected accounts, and integrations; access qualified leads; invite members.
+  - **`member`**: View automations and qualified leads.
+- **Super Admin Role**:
+  - Identified by `platform_role === 'super_admin'` or matching `SUPER_ADMIN_EMAIL`.
+  - Has access to `/admin` routes (system health, customers overview, audit logs, error logs).
+  - Normal customer users have `platform_role === 'customer'`.
 
-## Security
+---
 
-- Never expose secrets in frontend code.
-- Validate all external input with Zod schemas.
-- Verify Meta webhook signatures using HMAC-SHA256.
-- Protect authenticated routes with middleware.
-- Implement appropriate error handling — never expose stack traces to users.
-- Never log sensitive customer information (tokens, phone numbers, passwords).
-- Use environment variables for all secrets and API keys.
-- Sanitize user-facing error messages.
+## Meta & Instagram Integration Architecture
+
+### Meta Unified Login with Popup Return Flow
+Meta requires newer apps to use the **Instagram API with Unified Login** (`https://www.facebook.com/dialog/oauth` with `config_id=1106955532119603`). Standalone `instagram.com/oauth/authorize` endpoints are deprecated by Meta and return platform errors.
+
+1. **Dual Login Entrypoints (`prompt=login`)**:
+   - Both **Continue with Instagram** and **Continue with Facebook** buttons trigger the Unified Login flow with `prompt=login` so users are prompted to choose their profile rather than auto-continuing into a stale Facebook session.
+   - Flow opens in a **popup window** (`window.open(..., 'rawreply_oauth', 'width=600,height=720')`) passing `popup=1` to `/api/auth/meta/authorize`.
+2. **State Generation & Tamper Protection (`lib/meta/oauth-state.js`)**:
+   - Generates 32 random bytes (`crypto.randomBytes(32)`), associates `organizationId`, `userId`, `platform`, and `popup=true`.
+   - Stores in-memory/durable cache and signs a 10-minute HttpOnly cookie (`rawreply_meta_oauth_state`) with HMAC-SHA256.
+3. **Popup Completion via `window.opener.postMessage` (`app/api/auth/meta/callback/route.js`)**:
+   - Validates state cookie signature, TTL, and single-use consumption.
+   - On completion (success or error), returns a minimal HTML page that sends `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', success, username, platform, error })` and calls `window.close()`.
+   - Standalone browser flows gracefully fall back to `NextResponse.redirect()`.
+   - Parent window (`accounts-client.jsx`, `dashboard-overview-client.jsx`) listens for the `META_OAUTH_COMPLETE` message, automatically re-fetches account and overview data, and displays status banners without page reloads.
+4. **Token Exchange & Long-Lived Credentials**:
+   - OAuth `code` is exchanged for a short-lived token via `oauth/access_token`.
+   - Immediately exchanged for a 60-day long-lived User token via `grant_type=fb_exchange_token`.
+   - Encrypted with AES-256-GCM before saving into Neon `instagram_accounts`.
+5. **Account Discovery (`lib/meta/client.js`)**:
+   - Discovers Instagram Professional accounts using 3 resilient strategies:
+     1. Unified Login assigned accounts: `/me/assigned_instagram_accounts`
+     2. Business Portfolios: `/me/businesses` -> `/{business-id}/instagram_accounts`
+     3. Traditional Facebook Pages: `/me/accounts?fields=instagram_business_account{id,username,name,profile_picture_url}`
+   - Resolves both `instagram_business_account` and linked Facebook Page details.
+6. **Automatic Webhook Subscription**:
+   - Subscribes Facebook Page feed/messages webhooks: `POST /{page-id}/subscribed_apps?subscribed_fields=feed,messages`.
+   - Subscribes direct Instagram Business webhooks: `POST /{instagram_id}/subscribed_apps?subscribed_fields=comments,messages`.
+   - Can be re-verified anytime via the **Verify Webhooks** button (`/api/accounts/subscribe-webhooks`).
+7. **Media Synchronization**:
+   - Immediately fetches up to 24 recent posts and Reels via `GET /{ig-user-id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count`.
+   - Persists in Neon `instagram_media` with `account_id` foreign key.
+8. **Account Slots**:
+   - Enforces a maximum limit of **4 connected accounts** per customer organization workspace.
+
+---
+
+## Real-Time Webhook Pipeline & Automation Engine
+
+```
+[User Comments on IG Post / Reel]
+               │
+               ▼
+   [Meta Webhook Delivery]
+   POST /api/webhooks/instagram (or /api/webhooks/meta)
+               │
+               ├─► HMAC-SHA256 signature verification (X-Hub-Signature-256)
+               ├─► Durable deduplication in `webhook_events` (dedup_key = comment_id)
+               │   └─► If already processed, return 200 OK immediately
+               ▼
+   [Payload Parser & Normalizer]
+   Extracts comment_id, post_id, text, commenter_id, username
+   Ignores self-comments (commenter_id === account_id)
+               │
+               ▼
+   [Active Automation Matcher]
+   Queries Neon `automations` by organization_id & instagram_account_id
+   Matches post_id (supports exact ID and `med_` prefixed ID)
+   Checks trigger type:
+     - 'any': triggers on all valid comments
+     - 'keyword': checks case-insensitive comma-separated keywords
+               │
+               ▼
+   [Automation Execution]
+   1. Records comment in `comments` table
+   2. If public reply enabled:
+      POST https://graph.facebook.com/v21.0/{comment_id}/replies
+      body: { message: publicReplyText }
+   3. If private DM enabled:
+      POST https://graph.facebook.com/v21.0/{instagramAccountId}/messages
+      body: { recipient: { comment_id: comment_id }, message: { text: dmText } }
+   4. Records execution status in `automation_executions`
+   5. Logs any Graph API errors to `system_errors` with category 'META_API'
+```
+
+### Automation Execution Logging & Diagnostics
+- **`automation_executions`**: Logs every trigger execution with `status` (`completed`, `failed`), `public_reply_sent`, `dm_sent`, `trigger_text`, and execution duration.
+- **`system_errors`**: Captures Graph API error codes (e.g. error 10 / subcode 2534027 messaging window, permission errors) with full stack and metadata.
+- **Test Simulator (`/api/automations/test-simulate`)**: Diagnostic API allowing users to test trigger keyword matching, comment reply formatting, and DM payload construction directly in the UI without waiting for live Meta events.
+
+---
 
 ## RawReply Business Rules
 
-- **Only customers who submit a valid phone number qualify as leads.**
-- Do not permanently save unqualified commenters.
-- Do not create unnecessary conversation storage.
-- Qualified lead creation must be idempotent — same phone number + same post should not create duplicate leads.
-- Prevent duplicate lead exports to Excel.
-- Respect Meta API permissions, messaging windows (24-hour rule), and rate limits.
-- A comment triggers a DM workflow. The DM workflow collects requirements and a phone number.
-- Only after phone number submission does a commenter become a qualified lead.
-- Qualified leads are exported to the configured Excel destination.
+1. **Lead Qualification Rule**:
+   - **Only customers who submit a valid phone number qualify as leads.**
+   - Do not permanently save unqualified commenters as leads.
+   - Unqualified commenters only have ephemeral comment logs in `comments` and execution traces in `automation_executions`.
+2. **Idempotence**:
+   - Same phone number + same post MUST NEVER create duplicate leads in `captured_leads`.
+   - Prevent duplicate lead exports to Excel (`exported_to_excel` flag).
+3. **Meta Messaging Policy Compliance**:
+   - DMs initiated from comments use the Meta Private Replies API (`recipient: { comment_id }`), which operates within a 7-day window from comment creation.
+   - Ongoing conversation follow-ups respect Meta's standard 24-hour messaging window.
+4. **Lead Export Destination**:
+   - Qualified leads are synced to Microsoft Excel via Microsoft Graph API (`/api/integrations/microsoft`).
+   - Supports manual CSV/XLSX downloads and automated background workbook syncing.
 
-## Development Workflow
+---
 
-- Read `design.md` and `AGENTS.md` before implementation.
-- Work in phases — complete and test each phase before proceeding.
-- Test each phase before proceeding to the next.
-- Never rebuild working features unnecessarily.
-- Update documentation when architecture changes.
-- Run lint and production builds after significant changes.
-- Fix errors instead of hiding them.
-- Keep commits focused — one logical change per commit.
-- Use meaningful commit messages describing what changed and why.
+## Code Quality & Guardrails
+
+- **JavaScript Only**: Do not introduce TypeScript files (`.ts`, `.tsx`). All code must be idiomatic JavaScript with JSDoc where helpful.
+- **No Test Files**: Do not generate test files (`*.test.js`, `*.spec.js`, `__tests__/`) in this workspace.
+- **No Direct Git Push**: Never run `git push` unless explicitly asked by the user.
+- **No Hardcoded Secrets**: All tokens, app secrets, and connection strings must come from environment variables.
+- **Input Validation**: Use Zod schemas (`lib/validations/`) for external API and form input validation.
+- **Error Handling**: Never expose stack traces or raw database connection strings to the client. Return sanitized error messages.
+- **ESLint Cleanliness**: Ensure zero ESLint errors before completing tasks (`npm run lint`).
+- **Production Build Cleanliness**: Code must cleanly compile via `npm run build`.
+
+---
 
 ## Project Structure
 
 ```
-app/                          → Next.js App Router pages and layouts
-  (auth)/                     → Authentication route group
-    login/[[...sign-in]]/     → Custom Sign In page
-    signup/[[...sign-up]]/    → Custom Sign Up page
-    forgot-password/          → Password recovery request page
-    reset-password/           → Password reset confirmation page
-  (dashboard)/                → Dashboard route group
+app/
+  (auth)/
+    login/[[...sign-in]]/page.js    → Sign in page
+    signup/[[...sign-up]]/page.js   → Registration page
+    forgot-password/page.js         → Password recovery request
+    reset-password/page.js          → Password reset confirmation
+  (dashboard)/
     dashboard/
-      page.js                 → Overview metrics & checklist
-      automations/page.js     → Automation workflow management
-      accounts/page.js        → Instagram accounts management
-      leads/page.js           → Qualified leads management
-      integrations/page.js    → Instagram, Excel, Sheets integrations
-      team/page.js            → Workspace team management & invitations
-      settings/page.js        → Settings & webhook configuration
+      page.js                       → Dashboard overview (metrics, checklist, media grid)
+      accounts/page.js              → Connected social accounts & slots
+      automations/page.js          → Comment-to-DM trigger automation workflows
+      leads/page.js                 → Qualified leads management & exports
+      integrations/page.js          → Meta, Excel, Google Sheets integrations
+      team/page.js                  → Team members, invitations & workspace roles
+      settings/page.js              → Workspace settings & security
+  admin/                            → Super admin portal (/admin)
+  api/
+    accounts/                       → Account listing, disconnect, subscribe-webhooks
+    auth/                           → Login, register, refresh, password reset, me
+      meta/authorize/route.js       → Meta Unified Login OAuth initiator (popup aware)
+      meta/callback/route.js        → Meta OAuth callback (popup postMessage return)
+      meta/data-deletion/route.js   → Meta user data deletion callback
+      microsoft/                    → Microsoft OAuth authorize & callback
+    automations/                    → CRUD automations & /test-simulate endpoint
+    dashboard/overview/route.js     → Overview metrics & primary account state
+    instagram/media/route.js        → Cached media lookup & on-demand sync
+    integrations/                   → Integration statuses & Microsoft workbooks/worksheets
+    leads/                          → Qualified leads listing & Excel/CSV export
+    webhooks/
+      instagram/route.js            → Real-time Instagram comment & message webhook
+      meta/route.js                 → Meta Graph API feed & comments webhook
 components/
-  ui/                         → Reusable UI components (button, card, badge, table, etc.)
-  layout/                     → Layout components (sidebar, header)
-  shared/                     → Shared components (empty-state, metric-card, status-badge, icons)
+  dashboard/                        → Client components for dashboard views
+    accounts-client.jsx             → Dual popup login buttons, slot limits, guide
+    automations-manager.jsx         → Automation cards, edit modal, test trigger modal
+    dashboard-overview-client.jsx   → Overview metrics, checklist, media grid, popup OAuth
+    integrations-client.jsx         → Integration connection cards
+    leads-client.jsx                → Qualified leads cards, filters, and export
+    team-client.jsx                 → Team members management
+  layout/                           → Sidebar, header, mobile bottom navigation
+  shared/                           → Status badges, metric cards, empty states, icons
+  ui/                               → Reusable UI primitives (Button, Card, Badge, Input, Table)
 lib/
-  utils.js                    → Utility functions (cn)
-  constants.js                → Application constants, roles, integrations
-  validations/                → Zod validation schemas
-config/
-  navigation.js               → Navigation items (dashboard & public)
-  pricing.js                  → Provisional pricing plan definitions
-public/                       → Static assets
+  auth/                             → JWT tokens, cookies, passwords, permissions, sessions
+  crypto/                           → AES-256-GCM encryption & decryption
+  db/                               → Neon PostgreSQL client (`lib/db/client.js`) & SQL migrations
+  events/                           → Durable webhook event deduplication store
+  meta/                             → Meta Graph API client, Unified Login OAuth state, automation runner
+  monitoring/                       → Structured error logger (`system_errors`) & login tracker
+  storage/                          → Account store, lead store, integration store
+  validations/                      → Zod schemas for auth, phone numbers, and automations
 ```
 
-## Environment Variables
+---
 
-All environment variables are documented in `.env.example`.
-Never commit `.env.local` or any file containing real credentials.
+## Environment Variables Reference
+
+All required environment variables are documented in `.env.example`:
+- `DATABASE_URL`: Neon PostgreSQL connection string.
+- `JWT_ACCESS_SECRET`: 32-byte secret for access token signing.
+- `ENCRYPTION_SECRET`: 32-byte hex key for AES-256-GCM token encryption.
+- `META_APP_ID`: Meta Facebook App ID (`1531237922145783`).
+- `META_APP_SECRET`: Meta Facebook App Secret.
+- `META_CONFIG_ID`: Meta Configuration ID (`1106955532119603`).
+- `META_REDIRECT_URI`: OAuth callback URI (`https://rawreply.vercel.app/api/auth/meta/callback`).
+- `META_WEBHOOK_VERIFY_TOKEN`: Webhook subscription verification token.
+- `NEXT_PUBLIC_APP_URL`: Base application URL.
+- `MICROSOFT_CLIENT_ID` & `MICROSOFT_CLIENT_SECRET`: Azure Entra credentials for Excel sync.

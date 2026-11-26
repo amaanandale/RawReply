@@ -49,6 +49,49 @@ export async function GET(req) {
     return res;
   }
 
+  /**
+   * Returns an HTML page that posts a message to the opener window and closes itself.
+   * Used when the OAuth flow was initiated in a popup window.
+   */
+  function popupResponse({ success, username, platform, error }) {
+    const data = JSON.stringify({
+      type: "META_OAUTH_COMPLETE",
+      success: Boolean(success),
+      username: username || null,
+      platform: platform || "instagram",
+      error: error || null,
+    });
+
+    const html = `<!DOCTYPE html>
+<html><head><title>RawReply — Connecting...</title></head>
+<body>
+<p style="font-family:Inter,system-ui,sans-serif;text-align:center;padding:2rem;color:#667085;">
+  ${success ? "Account connected! This window will close automatically." : "Connection failed. This window will close automatically."}
+</p>
+<script>
+(function(){
+  try {
+    var msg = ${data};
+    if (window.opener && typeof window.opener.postMessage === "function") {
+      window.opener.postMessage(msg, "${appUrl}");
+    }
+  } catch(e) {}
+  setTimeout(function(){ window.close(); }, 600);
+})();
+</script>
+</body></html>`;
+
+    const res = new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+    // Cannot delete cookies on a raw Response directly; the popup script handles UI refresh
+    return res;
+  }
+
+  // Track whether this flow was opened in a popup (determined after state validation)
+  let isPopupFlow = false;
+
   // 1. Handle user cancellation or Meta authorization denial safely
   if (errorParam) {
     console.warn(
@@ -61,6 +104,25 @@ export async function GET(req) {
         timestamp: new Date().toISOString(),
       })
     );
+
+    // Try to detect popup from cookie before state validation (best effort)
+    try {
+      const cv = req.cookies?.get?.(STATE_COOKIE_NAME)?.value;
+      if (cv) {
+        const raw = Buffer.from(cv, "base64url").toString("utf8");
+        const { payload } = JSON.parse(raw);
+        const parsed = JSON.parse(payload);
+        if (parsed.popup) isPopupFlow = true;
+      }
+    } catch {}
+
+    if (isPopupFlow) {
+      return popupResponse({
+        success: false,
+        error: errorDescription || "Instagram authorization was cancelled or denied by Meta.",
+      });
+    }
+
     accountsRedirectUrl.searchParams.set("error", "oauth_denied");
     accountsRedirectUrl.searchParams.set(
       "message",
@@ -95,6 +157,12 @@ export async function GET(req) {
         timestamp: new Date().toISOString(),
       })
     );
+    if (validation.popup) {
+      return popupResponse({
+        success: false,
+        error: validation.error || "OAuth state verification failed. Please try connecting again.",
+      });
+    }
     accountsRedirectUrl.searchParams.set("error", validation.code || "invalid_state");
     accountsRedirectUrl.searchParams.set(
       "message",
@@ -102,6 +170,9 @@ export async function GET(req) {
     );
     return redirectWithClearedCookie(accountsRedirectUrl.toString());
   }
+
+  // Determine if this OAuth flow was initiated in a popup window
+  isPopupFlow = Boolean(validation.popup);
 
   // 5. Ensure authorization code is present
   if (!code) {
@@ -113,6 +184,11 @@ export async function GET(req) {
         timestamp: new Date().toISOString(),
       })
     );
+
+    if (isPopupFlow) {
+      return popupResponse({ success: false, error: "Missing authorization code from Meta callback." });
+    }
+
     accountsRedirectUrl.searchParams.set("error", "missing_code");
     accountsRedirectUrl.searchParams.set(
       "message",
@@ -159,6 +235,12 @@ export async function GET(req) {
       const facebookPages = await fetchUserFacebookPages(longLivedUserToken);
 
       if (!facebookPages || facebookPages.length === 0) {
+        if (isPopupFlow) {
+          return popupResponse({
+            success: false,
+            error: "No Facebook Pages were found for your account. Please ensure you are an Administrator of at least one Facebook Page.",
+          });
+        }
         accountsRedirectUrl.searchParams.set("error", "no_facebook_pages");
         accountsRedirectUrl.searchParams.set(
           "message",
@@ -174,6 +256,12 @@ export async function GET(req) {
           (a) => a.id === facebookPages[0].pageId || a.pageId === facebookPages[0].pageId
         );
         if (!isAlreadyConnected && existingAccounts.length >= 4) {
+          if (isPopupFlow) {
+            return popupResponse({
+              success: false,
+              error: "Maximum limit of 4 connected accounts reached. Please disconnect an existing account first.",
+            });
+          }
           accountsRedirectUrl.searchParams.set("error", "account_limit_reached");
           accountsRedirectUrl.searchParams.set(
             "message",
@@ -237,6 +325,11 @@ export async function GET(req) {
       destinationUrl.searchParams.set("success", "connected");
       destinationUrl.searchParams.set("platform", "facebook");
       destinationUrl.searchParams.set("username", primaryPage.pageName);
+
+      if (isPopupFlow) {
+        return popupResponse({ success: true, username: primaryPage.pageName, platform: "facebook" });
+      }
+
       return redirectWithClearedCookie(destinationUrl.toString());
     }
 
@@ -261,18 +354,20 @@ export async function GET(req) {
         // Non-critical diagnostic check
       }
 
+      const noIgMsg = detectedPageName
+        ? `We detected your Facebook Page "${detectedPageName}", but no Instagram Professional account was assigned or linked. Please make sure your Instagram account is Professional and selected during Meta login.`
+        : "No Instagram Professional (Business or Creator) account was found assigned or connected. Please make sure your Instagram account is Professional and selected during Meta login.";
+
+      if (isPopupFlow) {
+        return popupResponse({ success: false, error: noIgMsg });
+      }
+
       accountsRedirectUrl.searchParams.set("error", "no_instagram_business_account");
       if (detectedPageName) {
         accountsRedirectUrl.searchParams.set("page_name", detectedPageName);
-        accountsRedirectUrl.searchParams.set(
-          "message",
-          `We detected your Facebook Page "${detectedPageName}", but no Instagram Professional account was assigned or linked. Please make sure your Instagram account is Professional and selected during Meta login.`
-        );
+        accountsRedirectUrl.searchParams.set("message", noIgMsg);
       } else {
-        accountsRedirectUrl.searchParams.set(
-          "message",
-          "No Instagram Professional (Business or Creator) account was found assigned or connected. Please make sure your Instagram account is Professional and selected during Meta login."
-        );
+        accountsRedirectUrl.searchParams.set("message", noIgMsg);
       }
       return redirectWithClearedCookie(accountsRedirectUrl.toString());
     }
@@ -325,6 +420,12 @@ export async function GET(req) {
         (a) => a.instagramBusinessId === primaryTarget.instagram.id || a.id === primaryTarget.instagram.id
       );
       if (!isAlreadyConnected && existingAccounts.length >= 4) {
+        if (isPopupFlow) {
+          return popupResponse({
+            success: false,
+            error: "Maximum limit of 4 connected accounts reached. Please disconnect an existing account first.",
+          });
+        }
         accountsRedirectUrl.searchParams.set("error", "account_limit_reached");
         accountsRedirectUrl.searchParams.set(
           "message",
@@ -403,6 +504,10 @@ export async function GET(req) {
     destinationUrl.searchParams.set("platform", "instagram");
     destinationUrl.searchParams.set("username", primaryTarget.instagram.username);
 
+    if (isPopupFlow) {
+      return popupResponse({ success: true, username: primaryTarget.instagram.username, platform: "instagram" });
+    }
+
     const redirectResponse = redirectWithClearedCookie(destinationUrl.toString());
 
     // Synchronize user session cookie so the browser lands in the exact workspace organization
@@ -434,6 +539,10 @@ export async function GET(req) {
         code: err.code,
       })
     );
+
+    if (isPopupFlow) {
+      return popupResponse({ success: false, error: err.message || "Failed to complete Instagram account connection." });
+    }
 
     accountsRedirectUrl.searchParams.set("error", "connection_failed");
     accountsRedirectUrl.searchParams.set(

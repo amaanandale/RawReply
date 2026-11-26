@@ -33,6 +33,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
   const [isVerifyingWebhooks, setIsVerifyingWebhooks] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState(null);
   const [selectedFilter, setSelectedFilter] = React.useState("all");
+  const popupRef = React.useRef(null);
 
   const errorParam = searchParams.get("error");
   const successParam = searchParams.get("success");
@@ -74,6 +75,56 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
       window.history.replaceState(null, "", window.location.href.split("#")[0]);
     }
   }, []);
+
+  // Listen for postMessage from popup OAuth window
+  React.useEffect(() => {
+    function handleOAuthMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
+
+      if (event.data.success) {
+        setActionMessage({
+          type: "success",
+          text: `${event.data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${event.data.username ? ` — ${event.data.platform === "facebook" ? event.data.username : `@${event.data.username}`}` : ""}!`,
+        });
+        // Refresh accounts list
+        fetch("/api/accounts")
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => { if (data?.accounts) setAccounts(data.accounts); })
+          .catch(() => {});
+        router.refresh();
+      } else {
+        setActionMessage({
+          type: "error",
+          text: event.data.error || "Failed to connect account. Please try again.",
+        });
+      }
+    }
+
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, [router]);
+
+  // Open OAuth in a popup window
+  function handleConnectPopup(platform = "instagram") {
+    const url = `/api/auth/meta/authorize?platform=${platform}&popup=1`;
+    const popup = window.open(url, "rawreply_oauth", "width=600,height=720,left=200,top=100,toolbar=no,menubar=no");
+    popupRef.current = popup;
+
+    // Fallback: poll for popup close (if postMessage fails)
+    const pollTimer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(pollTimer);
+        popupRef.current = null;
+        // Refresh accounts after popup closes as fallback
+        fetch("/api/accounts")
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => { if (data?.accounts) setAccounts(data.accounts); })
+          .catch(() => {});
+        router.refresh();
+      }
+    }, 500);
+  }
 
   const totalUsed = accounts.length;
   const isLimitReached = totalUsed >= 4;
@@ -283,24 +334,20 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <Button
                 size="sm"
-                asChild
                 className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
+                onClick={() => handleConnectPopup("instagram")}
               >
-                <a href="/api/auth/meta/authorize?platform=instagram">
-                  <Instagram className="size-4 mr-1.5" />
-                  I&apos;ve Switched to Professional — Reconnect Instagram
-                </a>
+                <Instagram className="size-4 mr-1.5" />
+                I&apos;ve Switched to Professional — Reconnect Instagram
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                asChild
                 className="text-xs"
+                onClick={() => handleConnectPopup("facebook")}
               >
-                <a href="/api/auth/meta/authorize?platform=facebook">
-                  <Facebook className="size-3.5 mr-1.5 text-[#1877F2]" />
-                  Connect Facebook Page Instead
-                </a>
+                <Facebook className="size-3.5 mr-1.5 text-[#1877F2]" />
+                Connect Facebook Page Instead
               </Button>
             </div>
 
@@ -377,16 +424,25 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                     Slot Limit Reached (4/4) — Disconnect an account to add another
                   </div>
                 ) : (
-                  <Button
-                    size="sm"
-                    asChild
-                    className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-xs"
-                  >
-                    <a href="/api/auth/meta/authorize?platform=instagram">
-                      <Plus className="size-4 mr-1.5" />
-                      Connect Another Account
-                    </a>
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Button
+                      size="sm"
+                      className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white font-semibold shadow-xs"
+                      onClick={() => handleConnectPopup("instagram")}
+                    >
+                      <Instagram className="size-4 mr-1.5" />
+                      Continue with Instagram
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="min-h-[40px] sm:min-h-[36px] font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+                      onClick={() => handleConnectPopup("facebook")}
+                    >
+                      <Facebook className="size-4 mr-1.5 text-[#1877F2]" />
+                      Continue with Facebook
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -539,18 +595,10 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                     <Button
                       variant="ghost"
                       size="xs"
-                      asChild
                       className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => handleConnectPopup(isFb ? "facebook" : "instagram")}
                     >
-                      <a
-                        href={
-                          isFb
-                            ? "/api/auth/meta/authorize?platform=facebook"
-                            : "/api/auth/meta/authorize?platform=instagram"
-                        }
-                      >
-                        <RefreshCw className="size-3 mr-1" /> Reconnect
-                      </a>
+                      <RefreshCw className="size-3 mr-1" /> Reconnect
                     </Button>
                   </div>
                   <Button
@@ -574,7 +622,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           No {selectedFilter === "instagram" ? "Instagram accounts" : "Facebook Pages"} found matching this filter.
         </div>
       ) : (
-        /* Zero Accounts Empty State: Single Unified Login Card */
+        /* Zero Accounts Empty State: Dual Login Popup Buttons */
         <Card className="border-dashed border-border bg-card/60 p-8 flex flex-col justify-between text-center items-center max-w-md mx-auto">
           <div className="flex size-14 items-center justify-center rounded-full bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white shadow-xs mb-3">
             <Instagram className="size-7" />
@@ -583,17 +631,28 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs">
             Link your Instagram Business or Creator account via Meta Unified Login to listen to post and Reel comments, send automated replies, and capture qualified leads.
           </p>
-          <div className="mt-5 w-full flex flex-col items-center">
-            <Button size="sm" asChild className="w-full font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs">
-              <a href="/api/auth/meta/authorize?platform=instagram">
-                <Plus className="size-4 mr-1.5" />
-                Connect Instagram Account
-              </a>
+          <div className="mt-5 w-full flex flex-col items-center gap-2.5">
+            <Button
+              size="sm"
+              className="w-full font-semibold bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white shadow-xs"
+              onClick={() => handleConnectPopup("instagram")}
+            >
+              <Instagram className="size-4 mr-1.5" />
+              Continue with Instagram
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+              onClick={() => handleConnectPopup("facebook")}
+            >
+              <Facebook className="size-4 mr-1.5 text-[#1877F2]" />
+              Continue with Facebook
             </Button>
             <button
               type="button"
               onClick={() => setShowProfessionalGuide(true)}
-              className="mt-2.5 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+              className="mt-1 text-[11px] text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
             >
               Requires a free Professional account (view guide)
             </button>

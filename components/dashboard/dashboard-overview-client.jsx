@@ -50,6 +50,7 @@ export function DashboardOverviewClient({ initialOverviewData }) {
   const [mediaError, setMediaError] = React.useState(null);
   const [mediaFilter, setMediaFilter] = React.useState("all"); // 'all' | 'video' | 'image'
   const [isDisconnecting, setIsDisconnecting] = React.useState(false);
+  const popupRef = React.useRef(null);
   const [actionNotice, setActionNotice] = React.useState(
     successParam === "connected"
       ? {
@@ -102,6 +103,47 @@ export function DashboardOverviewClient({ initialOverviewData }) {
       setRefreshing(false);
     }
   }, []);
+
+  // Open OAuth in a popup window
+  const handleConnectPopup = React.useCallback((platform = "instagram") => {
+    const url = `/api/auth/meta/authorize?platform=${platform}&returnTo=/dashboard&popup=1`;
+    const popup = window.open(url, "rawreply_oauth", "width=600,height=720,left=200,top=100,toolbar=no,menubar=no");
+    popupRef.current = popup;
+
+    const pollTimer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(pollTimer);
+        popupRef.current = null;
+        refreshOverview();
+        router.refresh();
+      }
+    }, 500);
+  }, [refreshOverview, router]);
+
+  // Listen for postMessage from popup OAuth window
+  React.useEffect(() => {
+    function handleOAuthMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
+
+      if (event.data.success) {
+        setActionNotice({
+          type: "success",
+          text: `${event.data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${event.data.username ? ` — ${event.data.platform === "facebook" ? event.data.username : `@${event.data.username}`}` : ""}!`,
+        });
+        refreshOverview();
+        router.refresh();
+      } else {
+        setActionNotice({
+          type: "error",
+          text: event.data.error || "Failed to connect account. Please try again.",
+        });
+      }
+    }
+
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, [refreshOverview, router]);
 
   // Always hydrate latest live data on mount and when arriving from OAuth redirect
   React.useEffect(() => {
@@ -346,10 +388,11 @@ export function DashboardOverviewClient({ initialOverviewData }) {
               step="1"
               title="Connect your Instagram Professional account"
               description="Authorize RawReply to receive comment webhooks and send automated direct messages."
-              href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard"
+              href="/dashboard/accounts"
               actionLabel={isConnected ? "Linked" : "Connect Account"}
               completed={isConnected}
               isLink={!isConnected}
+              onAction={!isConnected ? () => handleConnectPopup("instagram") : undefined}
             />
             <ChecklistStep
               step="2"
@@ -443,12 +486,10 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs"
-                    asChild
+                    onClick={() => handleConnectPopup("instagram")}
                   >
-                    <a href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard">
-                      <RefreshCw className="size-3 mr-1.5" />
-                      Reconnect
-                    </a>
+                    <RefreshCw className="size-3 mr-1.5" />
+                    Reconnect
                   </Button>
                   <Button
                     variant="ghost"
@@ -476,12 +517,25 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                   </div>
                 </div>
 
-                <Button size="sm" className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold" asChild>
-                  <a href="/api/auth/meta/authorize?platform=instagram&returnTo=/dashboard">
+                <div className="flex flex-col gap-2">
+                  <Button
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white font-semibold shadow-xs"
+                    onClick={() => handleConnectPopup("instagram")}
+                  >
                     <Instagram className="size-4 mr-1.5" />
-                    Connect Instagram Account
-                  </a>
-                </Button>
+                    Continue with Instagram
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+                    onClick={() => handleConnectPopup("facebook")}
+                  >
+                    <Facebook className="size-4 mr-1.5 text-[#1877F2]" />
+                    Continue with Facebook
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -927,7 +981,7 @@ export function DashboardOverviewClient({ initialOverviewData }) {
   );
 }
 
-function ChecklistStep({ step, title, description, href, actionLabel, completed, isLink = true }) {
+function ChecklistStep({ step, title, description, href, actionLabel, completed, isLink = true, onAction }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3 transition-colors hover:bg-muted/20">
       <div className="flex items-start gap-3">
@@ -945,7 +999,15 @@ function ChecklistStep({ step, title, description, href, actionLabel, completed,
           </p>
         </div>
       </div>
-      {isLink ? (
+      {completed ? (
+        <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 shrink-0 text-xs">
+          {actionLabel}
+        </Badge>
+      ) : onAction ? (
+        <Button variant="outline" size="xs" onClick={onAction} className="shrink-0">
+          {actionLabel}
+        </Button>
+      ) : isLink ? (
         <Button variant="outline" size="xs" asChild className="shrink-0">
           <Link href={href}>{actionLabel}</Link>
         </Button>
