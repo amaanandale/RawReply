@@ -520,7 +520,7 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                 <div className="flex flex-col gap-2">
                   <Button
                     size="sm"
-                    className="w-full bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white font-semibold shadow-xs"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
                     onClick={() => handleConnectPopup("instagram")}
                   >
                     <Instagram className="size-4 mr-1.5" />
@@ -529,7 +529,7 @@ export function DashboardOverviewClient({ initialOverviewData }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+                    className="w-full font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
                     onClick={() => handleConnectPopup("facebook")}
                   >
                     <Facebook className="size-4 mr-1.5 text-[#1877F2]" />

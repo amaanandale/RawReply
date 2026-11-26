@@ -427,7 +427,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                   <div className="flex flex-wrap items-center gap-2.5">
                     <Button
                       size="sm"
-                      className="min-h-[40px] sm:min-h-[36px] bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white font-semibold shadow-xs"
+                      className="min-h-[40px] sm:min-h-[36px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
                       onClick={() => handleConnectPopup("instagram")}
                     >
                       <Instagram className="size-4 mr-1.5" />
@@ -436,7 +436,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="min-h-[40px] sm:min-h-[36px] font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+                      className="min-h-[40px] sm:min-h-[36px] font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
                       onClick={() => handleConnectPopup("facebook")}
                     >
                       <Facebook className="size-4 mr-1.5 text-[#1877F2]" />
@@ -634,7 +634,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
           <div className="mt-5 w-full flex flex-col items-center gap-2.5">
             <Button
               size="sm"
-              className="w-full font-semibold bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] hover:from-[#e08323] hover:via-[#c91e35] hover:to-[#a51578] text-white shadow-xs"
+              className="w-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
               onClick={() => handleConnectPopup("instagram")}
             >
               <Instagram className="size-4 mr-1.5" />
@@ -643,7 +643,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
             <Button
               size="sm"
               variant="outline"
-              className="w-full font-semibold text-[#1877F2] border-[#1877F2]/30 hover:bg-[#1877F2]/5"
+              className="w-full font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
               onClick={() => handleConnectPopup("facebook")}
             >
               <Facebook className="size-4 mr-1.5 text-[#1877F2]" />

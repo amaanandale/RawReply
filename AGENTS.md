@@ -57,8 +57,8 @@
 ### Meta Unified Login with Popup Return Flow
 Meta requires newer apps to use the **Instagram API with Unified Login** (`https://www.facebook.com/dialog/oauth` with `config_id=1106955532119603`). Standalone `instagram.com/oauth/authorize` endpoints are deprecated by Meta and return platform errors.
 
-1. **Dual Login Entrypoints (`prompt=login`)**:
-   - Both **Continue with Instagram** and **Continue with Facebook** buttons trigger the Unified Login flow with `prompt=login` so users are prompted to choose their profile rather than auto-continuing into a stale Facebook session.
+1. **Dual Login Entrypoints (`prompt=login`, `extras`)**:
+   - Both **Continue with Instagram** and **Continue with Facebook** buttons trigger the Unified Login flow with `prompt=login`. For Instagram, `extras={"setup":{"channel":"IG_API_ONBOARDING"}}` is passed so Meta's Business Tools dialog renders the Instagram onboarding choice alongside Facebook.
    - Flow opens in a **popup window** (`window.open(..., 'rawreply_oauth', 'width=600,height=720')`) passing `popup=1` to `/api/auth/meta/authorize`.
 2. **State Generation & Tamper Protection (`lib/meta/oauth-state.js`)**:
    - Generates 32 random bytes (`crypto.randomBytes(32)`), associates `organizationId`, `userId`, `platform`, and `popup=true`.
