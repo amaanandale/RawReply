@@ -16,6 +16,7 @@ import {
   subscribePageToWebhooks,
   subscribeInstagramAccountToWebhooks,
   fetchInstagramMedia,
+  graphRequest,
 } from "@/lib/meta/client";
 import { db } from "@/lib/db/client";
 import { accountStore } from "@/lib/storage/account-store";
@@ -73,10 +74,10 @@ export async function GET(req) {
   try {
     var msg = ${data};
     if (window.opener && typeof window.opener.postMessage === "function") {
-      window.opener.postMessage(msg, "${appUrl}");
+      window.opener.postMessage(msg, window.location.origin || "${appUrl}");
     }
   } catch(e) {}
-  setTimeout(function(){ window.close(); }, 600);
+  setTimeout(function(){ window.close(); }, 500);
 })();
 </script>
 </body></html>`;
@@ -335,12 +336,79 @@ export async function GET(req) {
 
     // ─────────────────────────────────────────────────────────────
     // BRANCH B: INSTAGRAM PROFESSIONAL ACCOUNT CONNECTION FLOW
-    // Comprehensively discovers Instagram accounts via:
-    // 1. Meta Instagram API with Unified Login (/me/assigned_instagram_accounts)
-    // 2. Meta Business Portfolios (/me/businesses -> instagram_accounts)
-    // 3. Traditional Facebook Pages (/me/accounts -> instagram_business_account)
+    // 1. First query /me/assigned_instagram_accounts for standalone Instagram Professional accounts
+    // 2. If assigned_instagram_accounts is empty, query /me/accounts for Facebook-linked accounts
+    // 3. Fallback to comprehensive discovery (businesses, assigned_pages)
     // ─────────────────────────────────────────────────────────────
-    const availableInstagramAccounts = await fetchAllInstagramAccounts(longLivedUserToken);
+    let availableInstagramAccounts = [];
+
+    // 1. Standalone Instagram Accounts via /me/assigned_instagram_accounts (Meta Unified Login)
+    try {
+      const assignedRes = await graphRequest(
+        `me/assigned_instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${encodeURIComponent(longLivedUserToken)}`
+      );
+      const assignedList = assignedRes.data || [];
+      for (const item of assignedList) {
+        if (!item.id) continue;
+        availableInstagramAccounts.push({
+          instagram: {
+            id: item.id,
+            username: item.username || `ig_${item.id}`,
+            name: item.name || item.username || "Instagram Account",
+            profilePictureUrl: item.profile_picture_url || null,
+            followersCount: item.followers_count || 0,
+            accountType: "BUSINESS",
+          },
+          pageId: null,
+          pageName: null,
+          pageToken: longLivedUserToken,
+          isUnifiedLogin: true,
+          isStandalone: true,
+        });
+      }
+    } catch (assignedErr) {
+      console.warn("[MetaOAuthCallback] /me/assigned_instagram_accounts check note:", assignedErr.message);
+    }
+
+    // 2. If empty, fall back to Facebook Pages via /me/accounts for Facebook-linked accounts
+    if (availableInstagramAccounts.length === 0) {
+      try {
+        const pagesRes = await graphRequest(
+          `me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url,followers_count}&access_token=${encodeURIComponent(longLivedUserToken)}`
+        );
+        const pagesList = pagesRes.data || [];
+        for (const page of pagesList) {
+          if (!page.instagram_business_account?.id) continue;
+          const ig = page.instagram_business_account;
+          availableInstagramAccounts.push({
+            instagram: {
+              id: ig.id,
+              username: ig.username || `ig_${ig.id}`,
+              name: ig.name || ig.username || page.name,
+              profilePictureUrl: ig.profile_picture_url || null,
+              followersCount: ig.followers_count || 0,
+              accountType: "BUSINESS",
+            },
+            pageId: page.id,
+            pageName: page.name,
+            pageToken: page.access_token,
+            isUnifiedLogin: false,
+            isStandalone: false,
+          });
+        }
+      } catch (pagesErr) {
+        console.warn("[MetaOAuthCallback] /me/accounts check note:", pagesErr.message);
+      }
+    }
+
+    // 3. Fallback to comprehensive discovery if both direct queries were empty
+    if (availableInstagramAccounts.length === 0) {
+      try {
+        availableInstagramAccounts = await fetchAllInstagramAccounts(longLivedUserToken);
+      } catch (fallbackErr) {
+        console.warn("[MetaOAuthCallback] fetchAllInstagramAccounts fallback note:", fallbackErr.message);
+      }
+    }
 
     if (availableInstagramAccounts.length === 0) {
       // Diagnostic check: check if user has any Facebook Pages without Instagram linked

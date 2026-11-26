@@ -105,7 +105,6 @@ export async function GET(req) {
           accessToken: effectiveToken,
           after: afterCursor,
           limit,
-          loginProvider: account.loginProvider || account.login_provider,
         });
 
     // 5. Cache media records in database

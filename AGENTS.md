@@ -54,38 +54,39 @@
 
 ## Meta & Instagram Integration Architecture
 
-### Dual-Channel OAuth Flows with Popup Return
-RawReply supports two dedicated OAuth connection channels: Direct Instagram Login (`instagram.com`) and Facebook Page Login (`facebook.com`), both using popup dialogs with `window.opener.postMessage` completion:
+### Instagram API with Unified Login & Dual Onboarding Popup
+RawReply integrates directly with Meta using the **Instagram API with Unified Login** (`IG_API_ONBOARDING`), allowing users with either a standalone Instagram Professional account (no Facebook Page required) OR a Facebook-linked Instagram account to connect seamlessly through a single popup window:
 
-1. **Instagram Direct Login (`instagram.com/oauth/authorize`)**:
-   - Initiated via `/api/auth/instagram/authorize?popup=1` using `buildInstagramDirectLoginUrl()`.
-   - Permissions requested: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`.
-   - Callback handled at `/api/auth/instagram/callback`:
-     1. Exchanges `code` via `POST https://api.instagram.com/oauth/access_token`.
-     2. Exchanges short-lived token for 60-day long-lived token via `GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token`.
-     3. Fetches profile and initial media from `https://graph.instagram.com/me`.
-     4. Saves to Neon `instagram_accounts` with `login_provider = 'instagram'`.
-2. **Facebook Page Login (`facebook.com/dialog/oauth`)**:
-   - Initiated via `/api/auth/meta/authorize?platform=facebook&popup=1` using `buildFacebookLoginUrl()`.
-   - Config ID (`META_CONFIG_ID`) and `display=popup`.
-   - Callback handled at `/api/auth/meta/callback` with `login_provider = 'facebook'`.
-3. **State Generation & Tamper Protection (`lib/meta/oauth-state.js`)**:
+1. **Unified Login Initiation (`/api/auth/meta/authorize`)**:
+   - Initiated via `/api/auth/meta/authorize?popup=1` (or `platform=instagram` / `platform=facebook`).
+   - Dynamically constructs `https://www.facebook.com/dialog/oauth` with:
+     - `client_id`: `META_APP_ID`
+     - `config_id`: `META_CONFIG_ID`
+     - `redirect_uri`: `META_REDIRECT_URI` (`/api/auth/meta/callback`)
+     - `response_type`: `code`
+     - `display`: `popup`
+     - `extras`: `{"setup":{"channel":"IG_API_ONBOARDING"}}`
+     - `state`: signed CSRF/organization state token
+   - Inside Meta's popup dialog, Meta renders both **"Log in with Instagram"** and **"Log in with Facebook"** onboarding options.
+2. **State Generation & Tamper Protection (`lib/meta/oauth-state.js`)**:
    - Generates 32 random bytes (`crypto.randomBytes(32)`), associates `organizationId`, `userId`, `platform`, and `popup=true`.
    - Stores in-memory/durable cache and signs a 10-minute HttpOnly cookie (`rawreply_meta_oauth_state`) with HMAC-SHA256.
+3. **Comprehensive Account Discovery in Callback (`/api/auth/meta/callback`)**:
+   - Exchanges `code` for long-lived User token via `https://graph.facebook.com/v21.0/oauth/access_token`.
+   - **Step 1 (Standalone IG)**: Queries `GET https://graph.facebook.com/v21.0/me/assigned_instagram_accounts?fields=id,username,name,profile_picture_url,followers_count` so standalone Instagram Professional accounts are detected immediately.
+   - **Step 2 (Facebook-Linked IG)**: If `assigned_instagram_accounts` is empty, falls back to `GET https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url,followers_count}`.
+   - **Step 3 (Facebook Pages)**: If `platform === 'facebook'`, connects the selected Facebook Business Page.
 4. **Popup Completion via `window.opener.postMessage`**:
-   - Both callbacks return a minimal HTML page that sends `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', success, username, platform, error })` and calls `window.close()`.
-   - Parent windows listen for `META_OAUTH_COMPLETE` and immediately re-fetch accounts and media in-place without page reloads.
-5. **Graph API Routing (`lib/meta/client.js` & `lib/meta/automation-runner.js`)**:
-   - Accounts connected via Direct Instagram Login (`login_provider === 'instagram'`) route comment replies, private DMs, and media queries through `https://graph.instagram.com/v21.0/...`.
-   - Accounts connected via Facebook Page Login (`login_provider === 'facebook'`) route through `https://graph.facebook.com/v21.0/...`.
-6. **Automatic Webhook Subscription**:
+   - Returns a minimal HTML page that sends `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', success: true, username, platform }, window.location.origin)` and calls `window.close()`.
+   - Parent dashboard windows (`accounts-client.jsx`, `dashboard-overview-client.jsx`) listen for `META_OAUTH_COMPLETE` and immediately re-fetch accounts and media in-place without page reloads.
+5. **Automatic Webhook Subscription**:
    - Subscribes Facebook Page feed/messages webhooks: `POST /{page-id}/subscribed_apps?subscribed_fields=feed,messages`.
    - Subscribes direct Instagram Business webhooks: `POST /{instagram_id}/subscribed_apps?subscribed_fields=comments,messages`.
    - Can be re-verified anytime via the **Verify Webhooks** button (`/api/accounts/subscribe-webhooks`).
-7. **Media Synchronization**:
+6. **Media Synchronization**:
    - Immediately fetches up to 24 recent posts and Reels via `GET /{ig-user-id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count`.
    - Persists in Neon `instagram_media` with `account_id` foreign key.
-8. **Account Slots**:
+7. **Account Slots**:
    - Enforces a maximum limit of **4 connected accounts** per customer organization workspace.
 
 ---
