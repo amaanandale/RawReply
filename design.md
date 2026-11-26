@@ -111,10 +111,10 @@ RawReply uses a refined neutral SaaS palette with a distinctive primary brand ac
 - **Workspace Social Account Slots**:
   - Visual capacity bar displaying `X of 4 slots used (Y remaining)`.
   - Disconnect action with confirmation dialog.
-- **Dual Meta Unified Login Actions**:
-  - **Continue with Instagram**: Emerald button (`bg-emerald-600 hover:bg-emerald-700 text-white`) triggering Meta Unified Login with `setup: { channel: 'IG_API_ONBOARDING' }` for Instagram Business/Creator accounts.
-  - **Continue with Facebook**: Clean emerald-accent outline button triggering Meta Facebook Pages flow.
-  - Both open in a 600x720 centered popup; upon completion, `window.opener.postMessage` auto-refreshes the view.
+- **Dual Separate OAuth Login Actions**:
+  - **Continue with Instagram**: Emerald button (`bg-emerald-600 hover:bg-emerald-700 text-white`) triggering direct Instagram OAuth (`https://www.instagram.com/oauth/authorize`) for Instagram Business/Creator accounts.
+  - **Continue with Facebook**: Clean emerald-accent outline button triggering Facebook Page Login (`https://www.facebook.com/dialog/oauth`).
+  - Both open in a 600x720 centered popup; upon completion, `window.opener.postMessage({ type: 'META_OAUTH_COMPLETE', ... })` auto-refreshes the view in-place.
 - **Webhook Verification**:
   - "Verify Webhooks" button on each account card triggers `/api/accounts/subscribe-webhooks` to confirm Meta Graph API delivers `comments` and `messages` events.
 - **Instagram Professional Setup Guide**:

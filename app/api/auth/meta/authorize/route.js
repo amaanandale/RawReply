@@ -7,12 +7,15 @@ import { accountStore } from "@/lib/storage/account-store";
 import {
   generateSecureOAuthState,
   buildMetaUnifiedLoginUrl,
+  buildInstagramDirectLoginUrl,
+  buildFacebookLoginUrl,
 } from "@/lib/meta/oauth-state";
 import {
   META_DEFAULT_APP_ID,
   META_DEFAULT_CONFIG_ID,
   META_DEFAULT_APP_SECRET,
   getMetaRedirectUri,
+  getInstagramRedirectUri,
 } from "@/lib/meta/constants";
 
 /**
@@ -130,7 +133,7 @@ export async function GET(req) {
     }
   }
 
-  const redirectUri = getMetaRedirectUri(req);
+  const redirectUri = platform === "instagram" ? getInstagramRedirectUri(req) : getMetaRedirectUri(req);
 
   // 3. Generate cryptographically secure random state (Node.js crypto.randomBytes(32), base64url)
   // and associated signed, tamper-proof HttpOnly cookie
@@ -149,7 +152,7 @@ export async function GET(req) {
     JSON.stringify({
       level: "info",
       service: "MetaOAuthAuthorize",
-      action: "unified_login_flow_initiated",
+      action: platform === "instagram" ? "instagram_direct_flow_initiated" : "facebook_page_flow_initiated",
       organizationId,
       userId,
       platform,
@@ -159,15 +162,22 @@ export async function GET(req) {
     })
   );
 
-  // 5. Construct Meta Unified Login authorization URL dynamically with URLSearchParams
-  const authorizationUrl = buildMetaUnifiedLoginUrl({
-    state,
-    req,
-    clientId: appId,
-    configId,
-    redirectUri,
-    platform,
-  });
+  // 5. Construct authorization URL dynamically with URLSearchParams
+  const authorizationUrl =
+    platform === "instagram"
+      ? buildInstagramDirectLoginUrl({
+          state,
+          req,
+          clientId: process.env.INSTAGRAM_APP_ID || appId,
+          redirectUri,
+        })
+      : buildFacebookLoginUrl({
+          state,
+          req,
+          clientId: appId,
+          configId,
+          redirectUri,
+        });
 
   // 6. Set HTTP-only, SameSite=lax cookie on redirect response
   const response = NextResponse.redirect(authorizationUrl);
