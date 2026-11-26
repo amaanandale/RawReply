@@ -51,9 +51,8 @@ export async function GET(req) {
   }
 
   /**
-   * Returns a lightweight HTML page that sends postMessage to window.opener,
-   * closes the window, and gracefully redirects to /dashboard/accounts?connected=1
-   * if the window opener is null (e.g. severed cross-origin opener on mobile/browser).
+   * Returns a polished HTML page that broadcasts completion via localStorage and postMessage,
+   * cleanly updates the parent RawReply dashboard, and closes the popup window without trapping the user.
    */
   function popupResponse({ success, username, platform, error, accessTokenToSync }) {
     const data = JSON.stringify({
@@ -62,6 +61,7 @@ export async function GET(req) {
       username: username || null,
       platform: platform || "instagram",
       error: error || null,
+      timestamp: Date.now(),
     });
 
     const targetUrl = `${appUrl}/dashboard/accounts?connected=1`;
@@ -69,72 +69,159 @@ export async function GET(req) {
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>RawReply — Connecting Account...</title>
-  <meta http-equiv="refresh" content="2;url=/dashboard/accounts?connected=1">
+  <meta charset="utf-8">
+  <title>RawReply — ${success ? "Account Connected" : "Connection Failed"}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      margin: 0;
-      background: #f8fafc;
-      color: #334155;
-      text-align: center;
       padding: 1.5rem;
     }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #059669;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 1rem;
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 1rem;
+      padding: 2rem 1.75rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+    .icon-success {
+      background: #ecfdf5;
+      color: #059669;
+    }
+    .icon-error {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #0f172a;
+    }
+    p {
+      font-size: 0.875rem;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 1.25rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-bottom: 1.5rem;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #059669;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #047857;
+    }
+    .link {
+      display: inline-block;
+      margin-top: 0.875rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .link:hover { color: #0f172a; }
   </style>
 </head>
 <body>
-  <div class="spinner"></div>
-  <h3 style="margin:0 0 0.5rem;font-size:1.1rem;color:#0f172a;">
-    ${success ? "Account Connected!" : "Connecting Account..."}
-  </h3>
-  <p style="margin:0 0 1rem;font-size:0.875rem;color:#64748b;">
-    ${success ? "Returning you to your RawReply dashboard..." : (error || "Finishing connection...")}
-  </p>
+  <div class="card">
+    ${success ? `
+      <div class="icon icon-success">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2>Account Connected!</h2>
+      <p>Your ${platform === "facebook" ? "Facebook Page" : "Instagram Account"} was connected successfully.</p>
+      ${username ? `<div class="badge">${platform === "facebook" ? username : "@" + username}</div>` : ""}
+      <button class="btn btn-primary" onclick="handleClose()">Close Window</button>
+      <a class="link" onclick="handleDashboard()">Return to Dashboard</a>
+    ` : `
+      <div class="icon icon-error">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+      </div>
+      <h2>Connection Incomplete</h2>
+      <p>${error || "Failed to connect account. Please try again."}</p>
+      <button class="btn btn-primary" onclick="handleClose()">Close Window</button>
+      <a class="link" onclick="handleDashboard()">Return to Dashboard</a>
+    `}
+  </div>
+
   <script>
-  (function(){
     var msg = ${data};
-    var origin = window.location.origin;
     var targetUrl = "${targetUrl}";
 
-    var messageSent = false;
+    // 1. Broadcast via localStorage (always reaches parent window even if opener was severed)
+    try {
+      localStorage.setItem("rawreply_oauth_complete", JSON.stringify(msg));
+    } catch(e) {}
+
+    // 2. Direct postMessage to window.opener if accessible
     if (window.opener && typeof window.opener.postMessage === "function") {
-      try {
-        window.opener.postMessage(msg, origin);
-        messageSent = true;
-      } catch(e) {
-        try {
-          window.opener.postMessage(msg, "*");
-          messageSent = true;
-        } catch(e2) {}
+      try { window.opener.postMessage(msg, window.location.origin); } catch(e) {
+        try { window.opener.postMessage(msg, "*"); } catch(e2) {}
       }
     }
 
-    if (messageSent) {
-      setTimeout(function(){
-        try { window.close(); } catch(e) {}
-        setTimeout(function(){ window.location.replace(targetUrl); }, 300);
-      }, 500);
-    } else {
-      setTimeout(function(){
+    // 3. Attempt graceful automatic window.close
+    setTimeout(function() {
+      try { window.close(); } catch(e) {}
+    }, 1200);
+
+    function handleClose() {
+      try { window.close(); } catch(e) {}
+      setTimeout(function() {
         window.location.replace(targetUrl);
       }, 300);
     }
-  })();
+
+    function handleDashboard() {
+      window.location.replace(targetUrl);
+    }
   </script>
 </body>
 </html>`;

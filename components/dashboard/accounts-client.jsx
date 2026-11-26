@@ -94,47 +94,69 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
     }
   }, []);
 
-  // Listen for postMessage from popup OAuth window
+  // Listen for OAuth completion via postMessage AND localStorage (immune to cross-origin severed openers)
   React.useEffect(() => {
-    function handleOAuthMessage(event) {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
-
-      if (event.data.success) {
+    function processCompletion(data) {
+      if (!data) return;
+      if (popupRef.current && !popupRef.current.closed) {
+        try { popupRef.current.close(); } catch {}
+      }
+      if (data.success) {
         setActionMessage({
           type: "success",
-          text: `${event.data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${event.data.username ? ` — ${event.data.platform === "facebook" ? event.data.username : `@${event.data.username}`}` : ""}!`,
+          text: `${data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${data.username ? ` — ${data.platform === "facebook" ? data.username : `@${data.username}`}` : ""}!`,
         });
         // Refresh accounts list
         fetch("/api/accounts")
           .then((r) => r.ok ? r.json() : null)
-          .then((data) => { if (data?.accounts) setAccounts(data.accounts); })
+          .then((res) => { if (res?.accounts) setAccounts(res.accounts); })
           .catch(() => {});
         router.refresh();
-      } else {
+      } else if (data.error) {
         setActionMessage({
           type: "error",
-          text: event.data.error || "Failed to connect account. Please try again.",
+          text: data.error || "Failed to connect account. Please try again.",
         });
       }
     }
 
+    function handleOAuthMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
+      processCompletion(event.data);
+    }
+
+    function handleStorage(event) {
+      if (event.key !== "rawreply_oauth_complete" || !event.newValue) return;
+      try {
+        const parsed = JSON.parse(event.newValue);
+        localStorage.removeItem("rawreply_oauth_complete");
+        processCompletion(parsed);
+      } catch {}
+    }
+
     window.addEventListener("message", handleOAuthMessage);
-    return () => window.removeEventListener("message", handleOAuthMessage);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("message", handleOAuthMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [router]);
 
   // Open OAuth in a popup window
   function handleConnectPopup(platform = "instagram") {
-    const url = `/api/auth/meta/authorize?platform=${platform}&popup=1`;
+    const url =
+      platform === "instagram"
+        ? "/api/auth/instagram/authorize?popup=1"
+        : "/api/auth/meta/authorize?platform=facebook&popup=1";
     const popup = window.open(url, "rawreply_oauth", "width=600,height=740,left=200,top=100,toolbar=no,menubar=no");
     popupRef.current = popup;
 
-    // Fallback: poll for popup close (if postMessage fails)
+    // Fallback: poll for popup close (if postMessage and storage fails)
     const pollTimer = setInterval(() => {
       if (popup && popup.closed) {
         clearInterval(pollTimer);
         popupRef.current = null;
-        // Refresh accounts after popup closes as fallback
         fetch("/api/accounts")
           .then((r) => r.ok ? r.json() : null)
           .then((data) => { if (data?.accounts) setAccounts(data.accounts); })

@@ -106,7 +106,10 @@ export function DashboardOverviewClient({ initialOverviewData }) {
 
   // Open OAuth in a popup window
   const handleConnectPopup = React.useCallback((platform = "instagram") => {
-    const url = `/api/auth/meta/authorize?platform=${platform}&returnTo=/dashboard&popup=1`;
+    const url =
+      platform === "instagram"
+        ? "/api/auth/instagram/authorize?returnTo=/dashboard&popup=1"
+        : "/api/auth/meta/authorize?platform=facebook&returnTo=/dashboard&popup=1";
     const popup = window.open(url, "rawreply_oauth", "width=600,height=740,left=200,top=100,toolbar=no,menubar=no");
     popupRef.current = popup;
 
@@ -120,29 +123,49 @@ export function DashboardOverviewClient({ initialOverviewData }) {
     }, 500);
   }, [refreshOverview, router]);
 
-  // Listen for postMessage from popup OAuth window
+  // Listen for OAuth completion via postMessage AND localStorage (immune to severed openers)
   React.useEffect(() => {
-    function handleOAuthMessage(event) {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
-
-      if (event.data.success) {
+    function processCompletion(data) {
+      if (!data) return;
+      if (popupRef.current && !popupRef.current.closed) {
+        try { popupRef.current.close(); } catch {}
+      }
+      if (data.success) {
         setActionNotice({
           type: "success",
-          text: `${event.data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${event.data.username ? ` — ${event.data.platform === "facebook" ? event.data.username : `@${event.data.username}`}` : ""}!`,
+          text: `${data.platform === "facebook" ? "Facebook Page" : "Instagram Account"} connected successfully${data.username ? ` — ${data.platform === "facebook" ? data.username : `@${data.username}`}` : ""}!`,
         });
         refreshOverview();
         router.refresh();
-      } else {
+      } else if (data.error) {
         setActionNotice({
           type: "error",
-          text: event.data.error || "Failed to connect account. Please try again.",
+          text: data.error || "Failed to connect account. Please try again.",
         });
       }
     }
 
+    function handleOAuthMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "META_OAUTH_COMPLETE") return;
+      processCompletion(event.data);
+    }
+
+    function handleStorage(event) {
+      if (event.key !== "rawreply_oauth_complete" || !event.newValue) return;
+      try {
+        const parsed = JSON.parse(event.newValue);
+        localStorage.removeItem("rawreply_oauth_complete");
+        processCompletion(parsed);
+      } catch {}
+    }
+
     window.addEventListener("message", handleOAuthMessage);
-    return () => window.removeEventListener("message", handleOAuthMessage);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("message", handleOAuthMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [refreshOverview, router]);
 
   // Always hydrate latest live data on mount and when arriving from OAuth redirect
