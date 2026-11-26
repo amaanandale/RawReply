@@ -37,6 +37,7 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
   const errorParam = searchParams.get("error");
   const successParam = searchParams.get("success");
+  const connectedParam = searchParams.get("connected");
   const usernameParam = searchParams.get("username");
   const platformParam = searchParams.get("platform");
   const messageParam = searchParams.get("message");
@@ -44,6 +45,23 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
   const isNoBusinessAccountError = errorParam === "no_instagram_business_account";
   const [showProfessionalGuide, setShowProfessionalGuide] = React.useState(isNoBusinessAccountError);
+
+  // If redirected back via connected=1 fallback, refresh accounts immediately
+  React.useEffect(() => {
+    if (connectedParam === "1") {
+      fetch("/api/accounts")
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.accounts) setAccounts(data.accounts);
+          setActionMessage({
+            type: "success",
+            text: "Instagram Account connected successfully!",
+          });
+        })
+        .catch(() => {});
+      router.replace("/dashboard/accounts");
+    }
+  }, [connectedParam, router]);
 
   async function handleVerifyWebhooks(accountId) {
     setIsVerifyingWebhooks(accountId);
@@ -107,7 +125,10 @@ export function AccountsClient({ initialAccounts, isConfigured = true }) {
 
   // Open OAuth in a popup window
   function handleConnectPopup(platform = "instagram") {
-    const url = `/api/auth/meta/authorize?platform=${platform}&popup=1`;
+    const url =
+      platform === "instagram"
+        ? "/api/auth/instagram/authorize?popup=1"
+        : "/api/auth/meta/authorize?platform=facebook&popup=1";
     const popup = window.open(url, "rawreply_oauth", "width=600,height=740,left=200,top=100,toolbar=no,menubar=no");
     popupRef.current = popup;
 

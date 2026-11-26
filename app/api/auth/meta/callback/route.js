@@ -51,10 +51,11 @@ export async function GET(req) {
   }
 
   /**
-   * Returns an HTML page that posts a message to the opener window and closes itself.
-   * Used when the OAuth flow was initiated in a popup window.
+   * Returns a lightweight HTML page that sends postMessage to window.opener,
+   * closes the window, and gracefully redirects to /dashboard/accounts?connected=1
+   * if the window opener is null (e.g. severed cross-origin opener on mobile/browser).
    */
-  function popupResponse({ success, username, platform, error }) {
+  function popupResponse({ success, username, platform, error, accessTokenToSync }) {
     const data = JSON.stringify({
       type: "META_OAUTH_COMPLETE",
       success: Boolean(success),
@@ -63,30 +64,89 @@ export async function GET(req) {
       error: error || null,
     });
 
-    const html = `<!DOCTYPE html>
-<html><head><title>RawReply — Connecting...</title></head>
-<body>
-<p style="font-family:Inter,system-ui,sans-serif;text-align:center;padding:2rem;color:#667085;">
-  ${success ? "Account connected! This window will close automatically." : "Connection failed. This window will close automatically."}
-</p>
-<script>
-(function(){
-  try {
-    var msg = ${data};
-    if (window.opener && typeof window.opener.postMessage === "function") {
-      window.opener.postMessage(msg, window.location.origin || "${appUrl}");
-    }
-  } catch(e) {}
-  setTimeout(function(){ window.close(); }, 500);
-})();
-</script>
-</body></html>`;
+    const targetUrl = `${appUrl}/dashboard/accounts?connected=1`;
 
-    const res = new Response(html, {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>RawReply — Connecting Account...</title>
+  <meta http-equiv="refresh" content="2;url=/dashboard/accounts?connected=1">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f8fafc;
+      color: #334155;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #059669;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h3 style="margin:0 0 0.5rem;font-size:1.1rem;color:#0f172a;">
+    ${success ? "Account Connected!" : "Connecting Account..."}
+  </h3>
+  <p style="margin:0 0 1rem;font-size:0.875rem;color:#64748b;">
+    ${success ? "Returning you to your RawReply dashboard..." : (error || "Finishing connection...")}
+  </p>
+  <script>
+  (function(){
+    var msg = ${data};
+    var origin = window.location.origin;
+    var targetUrl = "${targetUrl}";
+
+    var messageSent = false;
+    if (window.opener && typeof window.opener.postMessage === "function") {
+      try {
+        window.opener.postMessage(msg, origin);
+        messageSent = true;
+      } catch(e) {
+        try {
+          window.opener.postMessage(msg, "*");
+          messageSent = true;
+        } catch(e2) {}
+      }
+    }
+
+    if (messageSent) {
+      setTimeout(function(){
+        try { window.close(); } catch(e) {}
+        setTimeout(function(){ window.location.replace(targetUrl); }, 300);
+      }, 500);
+    } else {
+      setTimeout(function(){
+        window.location.replace(targetUrl);
+      }, 300);
+    }
+  })();
+  </script>
+</body>
+</html>`;
+
+    const res = new NextResponse(html, {
       status: 200,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
-    // Cannot delete cookies on a raw Response directly; the popup script handles UI refresh
+    res.cookies.delete(STATE_COOKIE_NAME);
+    if (accessTokenToSync) {
+      setAuthCookies(res, { accessToken: accessTokenToSync });
+    }
     return res;
   }
 
